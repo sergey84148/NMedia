@@ -16,5 +16,15 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
+        println(resources.displayMetrics.heightPixels) // 1794
+        println(resources.displayMetrics.widthPixels) // 1080
+        println(resources.displayMetrics.densityDpi) // 420
+        println(resources.displayMetrics.density) // 2.625
+
     }
 }
+
+
+//        println(R.string.hello) // число
+//        println(getString(R.string.hello)) // "Привет, Мир!" или "Hello World!"
