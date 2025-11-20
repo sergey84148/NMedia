@@ -1,11 +1,13 @@
 package ru.netology.nmedia
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import ru.netology.nmedia.databinding.ActivityMainBinding
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -22,7 +24,7 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-
+        // Создаем экземпляр модели Post
         val post = Post(
             id = 1,
             author = "Нетология. Университет интернет-профессий будущего",
@@ -34,49 +36,60 @@ class MainActivity : AppCompatActivity() {
             likedByMe = false
         )
 
-
+        // Присваиваем данные модели к UI-элементам
         with(binding) {
             author.text = post.author
             published.text = post.published
             content.text = post.content
 
-
+            // Формируем текст лейблов с числом
             likeCount.text = formatNumber(post.likes)
             shareCount.text = formatNumber(post.shares)
             viewsCount.text = formatNumber(post.views)
 
-
+            // Назначаем обработчики кликов
             like.setOnClickListener {
-
                 post.likedByMe = !post.likedByMe
-
-
                 if (post.likedByMe) {
                     post.likes++
                 } else {
                     post.likes--
                 }
-
-
                 like.setImageResource(if (post.likedByMe) R.drawable.ic_liked_24 else R.drawable.ic_like_24)
                 likeCount.text = formatNumber(post.likes)
             }
 
             share.setOnClickListener {
-
                 post.shares++
                 shareCount.text = formatNumber(post.shares)
             }
+            /**
+            // Обработчик для корневого элемента (общая область экрана)
+            binding.root.setOnClickListener {
+                println("Корневая область была нажата.")
+            }
+
+            // Обработчик для кнопки Like
+            binding.like.setOnClickListener {
+                println("Кнопка Like была нажата.")
+            }
+
+            // Обработчик для аватара
+            binding.avatar.setOnClickListener {
+                println("Аватар был нажат.")
+            }
+            **/
         }
     }
 
-
+    // Функция форматирования чисел
     private fun formatNumber(value: Int): String {
         return when {
             value >= 1_000_000 -> "${value / 1_000_000}.${(value % 1_000_000) / 100_000}M"
             value >= 10_000 -> "${value / 1000}K"
-            value > 999 -> "%.1fK".format((value / 1000.0))
+            value > 999 -> "${value / 1000}.${(value % 1000) / 100}K"
             else -> "$value"
         }
     }
 }
+
