@@ -10,6 +10,8 @@ import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.databinding.ActivityMainBinding
 import ru.netology.nmedia.viewmodel.PostViewModel
 
+
+
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,7 +36,7 @@ class MainActivity : AppCompatActivity() {
 
         // Наблюдаем за изменениями данных
         viewModel.data.observe(this) { posts ->
-            adapter.list = posts  // Автоматически вызовет notifyDataSetChanged()
+            adapter.submitList(posts)
         }
     }
 }

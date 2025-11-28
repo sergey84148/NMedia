@@ -2,6 +2,8 @@ package ru.netology.nmedia.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.CardPostBinding
@@ -13,66 +15,59 @@ typealias OnShareListener = (post: Post) -> Unit
 class PostsAdapter(
     private val onLikeListener: OnLikeListener,
     private val onShareListener: OnShareListener
-) : RecyclerView.Adapter<PostViewHolder>() {
+) : ListAdapter<Post, PostsAdapter.PostViewHolder>(DIFF_CALLBACK) {
 
-    var list = emptyList<Post>()
-        set(value) {
-            field = value
-            notifyDataSetChanged()  // Важно: перерисовка при обновлении списка
+    companion object {
+        private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<Post>() {
+            override fun areItemsTheSame(oldItem: Post, newItem: Post): Boolean =
+                oldItem.id == newItem.id
+
+            override fun areContentsTheSame(oldItem: Post, newItem: Post): Boolean =
+                oldItem == newItem
         }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostViewHolder {
-        val binding = CardPostBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val inflater = LayoutInflater.from(parent.context)
+        val binding = CardPostBinding.inflate(inflater, parent, false)
         return PostViewHolder(binding, onLikeListener, onShareListener)
     }
 
     override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
-        holder.bind(list[position])
+        holder.bind(getItem(position))  // Используем метод getItem() адаптера
     }
 
-    override fun getItemCount(): Int = list.size
-}
+    class PostViewHolder(
+        private val binding: CardPostBinding,
+        private val onLikeListener: OnLikeListener,
+        private val onShareListener: OnShareListener
+    ) : RecyclerView.ViewHolder(binding.root) {
 
-class PostViewHolder(
-    private val binding: CardPostBinding,
-    private val onLikeListener: OnLikeListener,
-    private val onShareListener: OnShareListener
-) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(post: Post) {
+            binding.apply {
+                author.text = post.author
+                published.text = post.published
+                content.text = post.content
+                likeCount.text = formatNumber(post.likes)
+                shareCount.text = formatNumber(post.shares)
 
-    fun bind(post: Post) {
-        binding.apply {
-            author.text = post.author
-            published.text = post.published
-            content.text = post.content
-            likeCount.text = formatNumber(post.likes)
-            shareCount.text = formatNumber(post.shares)
+                updateLikeIcon(post)
 
-            // Иконка лайка
-            like.setImageResource(
-                if (post.likedByMe) R.drawable.ic_liked_24 else R.drawable.ic_like_24
-            )
-            like.setOnClickListener { onLikeListener(post) }
-
-            // Иконка шера
-            share.setOnClickListener { onShareListener(post) }
+                like.setOnClickListener { onLikeListener(post) }
+                share.setOnClickListener { onShareListener(post) }
+            }
         }
-    }
 
-    // Исправленная функция форматирования
-    private fun formatNumber(value: Int): String {
-        return when {
-            value >= 1_000_000 -> {
-                val millions = value / 1_000_000
-                val remainder = (value % 1_000_000) / 100_000  // 1 цифра после точки
-                "${millions}.${remainder}M"
+        private fun updateLikeIcon(post: Post) {
+            binding.like.setImageResource(if (post.likedByMe) R.drawable.ic_liked_24 else R.drawable.ic_like_24)
+        }
+
+        private fun formatNumber(value: Int): String {
+            return when {
+                value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0)
+                value >= 1000 -> "%.1fK".format(value / 1000.0)
+                else -> "$value"
             }
-            value >= 10_000 -> "${value / 1000}K"  // Например, 15000 → 15K
-            value > 999 -> {
-                val thousands = value / 1000
-                val remainder = (value % 1000) / 100  // 1 цифра после точки
-                "${thousands}.${remainder}K"
-            }
-            else -> value.toString()
         }
     }
 }
