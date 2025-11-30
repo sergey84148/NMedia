@@ -1,30 +1,62 @@
 package ru.netology.nmedia.viewmodel
 
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.*
+import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.repository.PostRepositoryInMemoryImpl
-import ru.netology.nmedia.dto.Post
 
-class PostViewModel(
-    private val repository: PostRepository = PostRepositoryInMemoryImpl()
-) : ViewModel() {
+private val empty = Post(
+    id = 0,
+    author = "",
+    content = "",
+    published = "",
+    likes = 0,
+    shares = 0,
+    likedByMe = false
+)
 
-    private val _data = MutableLiveData<List<Post>>()
-    val data: MutableLiveData<List<Post>> = _data
+class PostViewModel(private val repository: PostRepository = PostRepositoryInMemoryImpl()) : ViewModel() {
 
-    init {
-        _data.value = repository.getAll().value ?: emptyList()
+    // Данные из репозитория
+    val data: LiveData<List<Post>> = repository.getAll()
+
+    // Переменная для редактирования поста
+    private val edited = MutableLiveData<Post?>(null)
+
+    // Наблюдательная переменная для результата редактирования
+    val editedPost: LiveData<Post?> = edited
+
+    // Метод для сохранения изменений
+    fun save(content: String) {
+        edited.value?.let {
+            val text = content.trim()
+            if (it.content != text) {
+                repository.save(it.copy(content = text))
+            }
+        }
+        edited.value = null
     }
 
+    // Запускает режим редактирования выбранного поста
+    fun edit(post: Post) {
+        edited.value = post
+    }
+
+    // Лайкает выбранный пост
     fun likeById(id: Long) {
         repository.likeById(id)
-        _data.value = repository.getAll().value  // Обновляем данные
     }
 
+    // Удаляет выбранный пост
+    fun removeById(id: Long) {
+        repository.removeById(id)
+    }
     fun shareById(id: Long) {
         repository.shareById(id)
-        _data.value = repository.getAll().value  // Обновляем данные
+    }
+
+    // Отмена редактирования
+    fun onCancelEdit() {
+        edited.value = null
     }
 }
