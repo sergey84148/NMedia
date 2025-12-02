@@ -5,8 +5,8 @@ import androidx.lifecycle.MutableLiveData
 import ru.netology.nmedia.dto.Post
 
 class PostRepositoryInMemoryImpl : PostRepository {
-
     private var nextId = 1L
+
     // Инициализируем список постов
     private var posts = listOf(
         Post(
@@ -39,7 +39,7 @@ class PostRepositoryInMemoryImpl : PostRepository {
         Post(
             id = 6,
             author = "Нетология. Университет интернет-профессий будущего",
-            content = "\uD83D\uDE80 24 сентября стартует новый поток бесплатного курса «Диджитал-старт: первый шаг к востребованной профессии» — за две недели вы попробуете себя в разных профессиях и определите, что подходит именно вам → http://netolo.gy/fQ",
+            content = " 24 сентября стартует новый поток бесплатного курса «Диджитал-старт: первый шаг к востребованной профессии» — за две недели вы попробуете себя в разных профессиях и определите, что подходит именно вам → http://netolo.gy/fQ",
             published = "21 сентября в 10:12",
             likes = 60,
             shares = 999999,
@@ -98,13 +98,12 @@ class PostRepositoryInMemoryImpl : PostRepository {
 
     override fun save(post: Post) {
         if (post.id == 0L) {
-
             posts = listOf(
                 post.copy(
                     id = nextId++,
-                    author = "Me",
+                    author = "Нетология. Университет интернет-профессий будущего",
                     likedByMe = false,
-                    published = "now"
+                    published = "9 мая в 8:36",
                 )
             ) + posts
             data.value = posts

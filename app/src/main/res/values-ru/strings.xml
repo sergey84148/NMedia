@@ -6,6 +6,10 @@
     <string name="description_post_menu">Меню поста</string>
     <string name="description_post_like">Нравится</string>
     <string name="description_post_share">Поделиться</string>
-    <string name="menu_remove">удалить</string>
-    <string name="menu_edit">редактировать</string>
+    <string name="description_post_save">Сохранить</string>
+    <string name="menu_remove">Удалить</string>
+    <string name="post_text">Текст сообщения</string>
+    <string name="menu_edit">Редактировать</string>
+    <string name="number_five">5</string>
+    <string name="error_empty_content">Содержимое не может быть пустым</string>
 </resources>

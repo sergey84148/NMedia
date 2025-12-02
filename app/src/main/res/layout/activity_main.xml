@@ -25,8 +25,8 @@
 
     <EditText
         android:id="@+id/content"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_width="326dp"
+        android:layout_height="51dp"
         android:background="@android:color/transparent"
         android:hint="@string/post_text"
         android:importantForAutofill="no"
@@ -48,4 +48,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/content"
         app:srcCompat="@drawable/ic_save_48" />
+
+    <ImageButton
+        android:id="@+id/cancel_edit"
+        android:layout_width="70dp"
+        android:layout_height="70dp"
+        android:layout_marginBottom="60dp"
+        android:background="@android:color/transparent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:srcCompat="@drawable/outline_add_circle_outline_24"
+        app:tint="#FF5722" />
 </androidx.constraintlayout.widget.ConstraintLayout>
