@@ -4,8 +4,9 @@ import androidx.lifecycle.*
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.repository.PostRepositoryInMemoryImpl
+import ru.netology.nmedia.util.AndroidUtils
 
-private val empty: Post = Post(
+val emptyTemplate: Post = Post(
     id = 0,
     author = "",
     content = "",
@@ -21,7 +22,7 @@ class PostViewModel(private val repository: PostRepository = PostRepositoryInMem
     val data: LiveData<List<Post>> = repository.getAll()
 
     // Переменная для редактирования поста
-    private val edited = MutableLiveData<Post?>(empty)
+    private val edited = MutableLiveData<Post?>(emptyTemplate) // Используем emptyTemplate вместо empty
 
     // Наблюдательная переменная для результата редактирования
     val editedPost: LiveData<Post?> = edited
@@ -34,7 +35,7 @@ class PostViewModel(private val repository: PostRepository = PostRepositoryInMem
                 repository.save(it.copy(content = text))
             }
         }
-        edited.value = null
+        edited.value = emptyTemplate
     }
 
     // Запускает режим редактирования выбранного поста
@@ -51,12 +52,13 @@ class PostViewModel(private val repository: PostRepository = PostRepositoryInMem
     fun removeById(id: Long) {
         repository.removeById(id)
     }
+
     fun shareById(id: Long) {
         repository.shareById(id)
     }
 
     // Отмена редактирования
     fun onCancelEdit() {
-        edited.value = null
+        edited.value = emptyTemplate
     }
 }

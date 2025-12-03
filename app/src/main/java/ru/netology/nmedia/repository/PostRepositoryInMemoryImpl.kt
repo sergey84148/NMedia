@@ -5,7 +5,7 @@ import androidx.lifecycle.MutableLiveData
 import ru.netology.nmedia.dto.Post
 
 class PostRepositoryInMemoryImpl : PostRepository {
-    private var nextId = 1L
+    private var nextId = 10L
 
     // Инициализируем список постов
     private var posts = listOf(

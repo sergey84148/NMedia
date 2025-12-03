@@ -84,9 +84,12 @@ class MainActivity : AppCompatActivity() {
 
         // Назначаем обработчик кликов на кнопку отмены
         cancelEditBtn.setOnClickListener {
-            // Уже доступна ссылка на EditText через привязку (binding.content)
+            // Очищаем текст
             binding.content.setText("")
-            cancelEditBtn.visibility = View.GONE
+            // Потеря фокуса
+            binding.content.clearFocus()
+            // Скрываем клавиатуру
+            AndroidUtils.hideKeyboard(binding.content)
         }
 
         // Наблюдаем за списком постов
