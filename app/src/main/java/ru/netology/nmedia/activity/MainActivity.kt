@@ -84,6 +84,7 @@ class MainActivity : AppCompatActivity() {
 
         // Назначаем обработчик кликов на кнопку отмены
         cancelEditBtn.setOnClickListener {
+            viewModel.onCancelEdit()
             // Очищаем текст
             binding.content.setText("")
             // Потеря фокуса

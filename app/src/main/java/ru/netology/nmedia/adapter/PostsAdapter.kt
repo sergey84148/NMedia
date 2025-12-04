@@ -42,7 +42,7 @@ class PostViewHolder(
             author.text = post.author
             published.text = post.published
             content.text = post.content
-            likeCount.text = formatNumber(post.likes)
+           // likeCount.text = formatNumber(post.likes)
             shareCount.text = formatNumber(post.shares)
 
             like.isChecked = post.likedByMe

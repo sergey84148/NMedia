@@ -4,7 +4,6 @@ import androidx.lifecycle.*
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.repository.PostRepositoryInMemoryImpl
-import ru.netology.nmedia.util.AndroidUtils
 
 val emptyTemplate: Post = Post(
     id = 0,
