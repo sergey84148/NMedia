@@ -1,12 +1,9 @@
 package ru.netology.nmedia.activity
 
+import android.content.Intent
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.View
-import android.widget.ImageButton
-import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -16,34 +13,60 @@ import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.databinding.ActivityMainBinding
 import ru.netology.nmedia.dto.Post
-import ru.netology.nmedia.util.AndroidUtils
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
     private val viewModel: PostViewModel by viewModels()
-    private lateinit var adapter: PostsAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        // Инициализация View Binding
-        binding = ActivityMainBinding.inflate(layoutInflater)
+        val binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        // Настройка отступов с учётом системных панелей
         ViewCompat.setOnApplyWindowInsetsListener(binding.main) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        // Установка адаптер с обработчиками взаимодействий
-        adapter = PostsAdapter(object : OnInteractionListener {
+        // Регистрация ожидаемого результата от EditPostActivity
+        val editPostLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK && result.data != null) {
+                val editedContent = result.data!!.getStringExtra(NewPostActivity.RESULT_EDITED_POST)
+                if (editedContent != null) {
+                    viewModel.updateEditedPost(editedContent)
+                }
+            }
+        }
+
+        // Регистрация ожидаемого результата от NewPostActivity
+        val newPostLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK && result.data != null) {
+                val newContent = result.data!!.getStringExtra(NewPostActivity.EXTRA_NEW_POST_CONTENT)
+                if (newContent != null) {
+                    // Формируем новый пост и передаем его в ViewModel
+                    val newPost = Post(
+                        id = System.currentTimeMillis(),
+                        author = "Автор",
+                        content = newContent,
+                        published = "Сегодня",
+                        likes = 0,
+                        shares = 0,
+                        likedByMe = false
+                    )
+                    viewModel.save(newPost)
+                }
+            }
+        }
+
+        // Настроим адаптер и обработчики
+        val adapter = PostsAdapter(object : OnInteractionListener {
             override fun onEdit(post: Post) {
-                viewModel.edit(post)
+                // Переход на экран редактирования
+                val intent = Intent(this@MainActivity, NewPostActivity::class.java)
+                intent.putExtra(NewPostActivity.EXTRA_POST_CONTENT, post.content)
+                editPostLauncher.launch(intent)
             }
 
             override fun onLike(post: Post) {
@@ -56,81 +79,24 @@ class MainActivity : AppCompatActivity() {
 
             override fun onShare(post: Post) {
                 viewModel.shareById(post.id)
-            }
-
-            override fun onCancelEdit(post: Post) {
-                viewModel.onCancelEdit()
+                val intent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, post.content)
+                    type = "text/plain"
+                }
+                val shareIntent = Intent.createChooser(intent, getString(R.string.chooser_share_post))
+                startActivity(shareIntent)
             }
         })
 
-        // Привязка адаптера к RecyclerView
         binding.list.adapter = adapter
-
-        // Получаем ссылку на кнопку отмены
-        val cancelEditBtn = findViewById<ImageButton>(R.id.cancel_edit)
-
-        // Добавляем обработчик изменений текста для управления видимостью кнопки
-        binding.content.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                // Показываем кнопку, если текст есть, иначе скрываем
-                val hasText = !binding.content.text.isNullOrBlank()
-                cancelEditBtn.visibility = if (hasText) View.VISIBLE else View.GONE
-            }
-
-            override fun afterTextChanged(s: Editable?) {}
-        })
-
-        // Назначаем обработчик кликов на кнопку отмены
-        cancelEditBtn.setOnClickListener {
-            viewModel.onCancelEdit()
-            // Очищаем текст
-            binding.content.setText("")
-            // Потеря фокуса
-            binding.content.clearFocus()
-            // Скрываем клавиатуру
-            AndroidUtils.hideKeyboard(binding.content)
-        }
-
-        // Наблюдаем за списком постов
         viewModel.data.observe(this) { posts ->
             adapter.submitList(posts)
         }
 
-        // Наблюдаем за редактируемым постом
-        viewModel.editedPost.observe(this) { post ->
-            if (post == null) {
-                // Сбрасываем состояние редактирования
-                binding.content.setText("")
-                AndroidUtils.hideKeyboard(binding.content)
-            } else {
-                // Активируем режим редактирования
-                with(binding.content) {
-                    setText(post.content)
-                    requestFocus()
-                    AndroidUtils.showKeyboard(this)
-                }
-            }
-        }
-
-        // Обрабатываем нажатие на кнопку сохранения
-        binding.save.setOnClickListener {
-            with(binding.content) {
-                if (text.isNullOrBlank()) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        context.getString(R.string.error_empty_content),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    return@setOnClickListener
-                }
-
-                viewModel.save(text.toString())
-                setText("")
-                clearFocus()
-                AndroidUtils.hideKeyboard(this)
-            }
+        // Установка обработчика FAB для создания нового поста
+        binding.fab.setOnClickListener {
+            newPostLauncher.launch(Intent(this, NewPostActivity::class.java))
         }
     }
 }

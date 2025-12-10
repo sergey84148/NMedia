@@ -12,4 +12,9 @@
     <string name="menu_edit">Редактировать</string>
     <string name="number_five">5</string>
     <string name="error_empty_content">Содержимое не может быть пустым</string>
+    <string name="apps_not_found">Приложения не найдены</string>
+    <string name="chooser_share_post">Выберите приложение для отправки</string>
+    <string name="add_post">Добавить пост</string>
+    <string name="save">Сохранять</string>
+    <string name="button_play">Плей</string>
 </resources>

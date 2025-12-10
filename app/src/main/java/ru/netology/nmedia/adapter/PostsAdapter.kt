@@ -15,7 +15,7 @@ interface OnInteractionListener {
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
-    fun onCancelEdit(post: Post) {}
+    //fun onCancelEdit(post: Post) {}
 }
 
 class PostsAdapter(
@@ -42,16 +42,10 @@ class PostViewHolder(
             author.text = post.author
             published.text = post.published
             content.text = post.content
-           // likeCount.text = formatNumber(post.likes)
-           // shareCount.text = formatNumber(post.shares)
 
             like.isChecked = post.likedByMe
             like.text = post.likes.toString()
             share.text = formatNumber(post.shares)
-
-            // like.setImageResource(
-            //   if (post.likedByMe) R.drawable.ic_liked_24 else R.drawable.ic_like_24
-            // )
 
             menu.setOnClickListener {
                 PopupMenu(it.context, it).apply {
@@ -78,11 +72,7 @@ class PostViewHolder(
 
             share.setOnClickListener {
                 onInteractionListener.onShare(post)
-            }
-
-            // Обработка отмены редактирования
-            cancelEdit.setOnClickListener {
-                onInteractionListener.onCancelEdit(post)
+                share.text = formatNumber(post.shares)
             }
         }
     }

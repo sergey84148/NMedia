@@ -20,34 +20,27 @@ class PostViewModel(private val repository: PostRepository = PostRepositoryInMem
     // Данные из репозитория
     val data: LiveData<List<Post>> = repository.getAll()
 
-    // Переменная для редактирования поста
-    private val edited = MutableLiveData<Post?>(emptyTemplate) // Используем emptyTemplate вместо empty
+    // Метод для сохранения нового поста
+    fun save(post: Post) {
+        repository.save(post)
+    }
 
-    // Наблюдательная переменная для результата редактирования
-    val editedPost: LiveData<Post?> = edited
-
-    // Метод для сохранения изменений
-    fun save(content: String) {
-        edited.value?.let {
-            val text = content.trim()
-            if (it.content != text) {
-                repository.save(it.copy(content = text))
-            }
+    // Метод для обновления содержания поста
+    fun updateEditedPost(newContent: String) {
+        // Здесь реализуется логика нахождения оригинального поста и обновления его содержимого
+        // Например, ищем последний редактируемый пост и применяем к нему новые данные
+        val originalPost = repository.findLastEditedPost()
+        if (originalPost != null) {
+            val updatedPost = originalPost.copy(content = newContent)
+            repository.save(updatedPost)
         }
-        edited.value = emptyTemplate
     }
 
-    // Запускает режим редактирования выбранного поста
-    fun edit(post: Post) {
-        edited.value = post
-    }
-
-    // Лайкает выбранный пост
+    // Другие методы остаются без изменений
     fun likeById(id: Long) {
         repository.likeById(id)
     }
 
-    // Удаляет выбранный пост
     fun removeById(id: Long) {
         repository.removeById(id)
     }
@@ -56,8 +49,5 @@ class PostViewModel(private val repository: PostRepository = PostRepositoryInMem
         repository.shareById(id)
     }
 
-    // Отмена редактирования
-    fun onCancelEdit() {
-        edited.value = emptyTemplate
-    }
+
 }
