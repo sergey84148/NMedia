@@ -17,4 +17,5 @@
     <string name="add_post">Добавить пост</string>
     <string name="save">Сохранять</string>
     <string name="button_play">Плей</string>
+    <string name="playButton">Плей</string>
 </resources>

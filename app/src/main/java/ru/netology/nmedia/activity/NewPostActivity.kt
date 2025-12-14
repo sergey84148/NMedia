@@ -67,7 +67,7 @@ class NewPostActivity : AppCompatActivity() {
         // Обработчик OK-кнопки
         binding.ok.setOnClickListener {
             if (binding.edit.text.isNullOrBlank()) {
-                setResult(Activity.RESULT_CANCELED)
+                setResult(RESULT_CANCELED)
             } else {
                 val intent = Intent()
                 val content = binding.edit.text.toString()

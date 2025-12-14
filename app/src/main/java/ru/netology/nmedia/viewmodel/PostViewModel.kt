@@ -1,5 +1,6 @@
 package ru.netology.nmedia.viewmodel
 
+import android.app.Application
 import androidx.lifecycle.*
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.repository.PostRepository
@@ -15,32 +16,46 @@ val emptyTemplate: Post = Post(
     likedByMe = false
 )
 
-class PostViewModel(private val repository: PostRepository = PostRepositoryInMemoryImpl()) : ViewModel() {
-
-    // Данные из репозитория
+class PostViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: PostRepository = PostRepositoryInMemoryImpl(application)
     val data: LiveData<List<Post>> = repository.getAll()
+    private val edited = MutableLiveData<Post?>(emptyTemplate)
 
-    // Метод для сохранения нового поста
-    fun save(post: Post) {
-        repository.save(post)
-    }
+    // Наблюдательная переменная для результата редактирования
+    val editedPost: LiveData<Post?> = edited
 
-    // Метод для обновления содержания поста
     fun updateEditedPost(newContent: String) {
-        // Здесь реализуется логика нахождения оригинального поста и обновления его содержимого
-        // Например, ищем последний редактируемый пост и применяем к нему новые данные
-        val originalPost = repository.findLastEditedPost()
-        if (originalPost != null) {
-            val updatedPost = originalPost.copy(content = newContent)
-            repository.save(updatedPost)
+        edited.value?.let {
+            val text = newContent.trim()
+            if (it.content != text) {
+                repository.save(it.copy(content = text))
+            }
         }
+        edited.value = emptyTemplate
     }
 
-    // Другие методы остаются без изменений
+    // Метод для сохранения изменений
+    fun save(content: String) {
+        edited.value?.let {
+            val text = content.trim()
+            if (it.content != text) {
+                repository.save(it.copy(content = text))
+            }
+        }
+        edited.value = emptyTemplate
+    }
+
+    // Запускает режим редактирования выбранного поста
+    fun edit(post: Post) {
+        edited.value = post
+    }
+
+    // Лайкает выбранный пост
     fun likeById(id: Long) {
         repository.likeById(id)
     }
 
+    // Удаляет выбранный пост
     fun removeById(id: Long) {
         repository.removeById(id)
     }
@@ -49,5 +64,9 @@ class PostViewModel(private val repository: PostRepository = PostRepositoryInMem
         repository.shareById(id)
     }
 
+    // Отмена редактирования
+    fun onCancelEdit() {
+        edited.value = emptyTemplate
+    }
 
 }

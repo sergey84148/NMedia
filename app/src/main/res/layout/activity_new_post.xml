@@ -13,7 +13,8 @@
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
         android:gravity="start|top"
-        android:inputType="textMultiLine" />
+        android:inputType="textMultiLine"
+        android:layout_gravity="start|top" />
 
     <ImageView
         android:id="@+id/cancel_edit"
@@ -25,7 +26,6 @@
         android:src="@drawable/ic_cancel"
         app:layout_anchor="@id/ok"
         app:layout_anchorGravity="right|top" />
-
     <com.google.android.material.bottomappbar.BottomAppBar
         android:id="@+id/bottomAppBar"
         style="@style/Widget.MaterialComponents.BottomAppBar.Colored"

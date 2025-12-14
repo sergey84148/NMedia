@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:padding="@dimen/common_spacing">
 
-
+    <!-- Аватар автора -->
     <ImageView
         android:id="@+id/avatar"
         android:layout_width="@dimen/posts_avatar_size"
@@ -19,6 +19,7 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:srcCompat="@sample/posts.json/data/authorAvatar" />
 
+    <!-- Имя автора -->
     <TextView
         android:id="@+id/author"
         android:layout_width="0dp"
@@ -34,6 +35,7 @@
         app:layout_constraintVertical_chainStyle="packed"
         tools:text="@sample/posts.json/data/author" />
 
+    <!-- Дата публикации -->
     <TextView
         android:id="@+id/published"
         android:layout_width="0dp"
@@ -47,6 +49,7 @@
         app:layout_constraintTop_toBottomOf="@id/author"
         tools:text="@sample/posts.json/data/published" />
 
+    <!-- Меню -->
     <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/menu"
         android:layout_width="wrap_content"
@@ -57,6 +60,7 @@
         app:layout_constraintTop_toTopOf="parent"
         android:button="@drawable/ic_more_vert_24" />
 
+    <!-- Заголовок -->
     <androidx.constraintlayout.widget.Barrier
         android:id="@+id/header"
         android:layout_width="wrap_content"
@@ -64,6 +68,7 @@
         app:barrierDirection="bottom"
         app:constraint_referenced_ids="avatar,published,menu" />
 
+    <!-- Текст поста -->
     <TextView
         android:id="@+id/content"
         android:layout_width="0dp"
@@ -76,9 +81,10 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/header"
         tools:text="@sample/posts.json/data/content" />
-    
+
+    <!-- Блок видео -->
     <LinearLayout
-        android:id="@+id/video_block"
+        android:id="@+id/video_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:visibility="gone"
@@ -88,27 +94,29 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:src="@drawable/video_placeholder"
-            android:scaleType="centerCrop" />
+            android:id="@+id/videoThumbnail"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:src="@drawable/video_placeholder"
+        android:scaleType="centerCrop" />
 
         <Button
+            android:id="@+id/playButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:text="@string/button_play" />
+            android:text="@string/playButton" />
     </LinearLayout>
 
-    <!-- Другие элементы поста -->
-
+    <!-- Футер -->
     <androidx.constraintlayout.widget.Barrier
         android:id="@+id/footer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:barrierDirection="bottom"
-        app:constraint_referenced_ids="content,video_block" />
+        app:constraint_referenced_ids="content,video_container" />
 
+    <!-- Кнопка "Нравится" -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/like"
         style="@style/Widget.AppTheme.LikeButton"
@@ -122,6 +130,7 @@
         app:icon="@drawable/ic_like_selector"
         tools:checked="false"/>
 
+    <!-- Счетчик лайков -->
     <TextView
         android:id="@+id/likeCount"
         android:layout_width="wrap_content"
@@ -131,6 +140,7 @@
         app:layout_constraintTop_toBottomOf="@id/footer"
         tools:text="10" />
 
+    <!-- Кнопка "Поделиться" -->
     <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/share"
         android:layout_width="wrap_content"
@@ -142,6 +152,7 @@
         app:layout_constraintTop_toBottomOf="@id/footer"
         android:button="@drawable/ic_share_24" />
 
+    <!-- Кнопка "Просмотры" -->
     <ImageButton
         android:id="@+id/views"
         android:layout_width="wrap_content"
@@ -153,6 +164,17 @@
         app:layout_constraintTop_toBottomOf="@id/footer"
         app:srcCompat="@drawable/ic_views_24" />
 
+    <!-- Счетчик просмотров -->
+    <TextView
+        android:id="@+id/viewsCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/common_spacing"
+        android:text="@string/number_five"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/footer" />
+
+    <!-- Кнопка отмены редактирования -->
     <ImageView
         android:id="@+id/cancel_edit"
         android:layout_width="wrap_content"
@@ -162,14 +184,5 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />
-
-    <TextView
-        android:id="@+id/viewsCount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/common_spacing"
-        android:text="@string/number_five"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/footer" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

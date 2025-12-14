@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
                 val newContent = result.data!!.getStringExtra(NewPostActivity.EXTRA_NEW_POST_CONTENT)
                 if (newContent != null) {
                     // Формируем новый пост и передаем его в ViewModel
-                    val newPost = Post(
+                    val post = Post(
                         id = System.currentTimeMillis(),
                         author = "Автор",
                         content = newContent,
@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
                         shares = 0,
                         likedByMe = false
                     )
-                    viewModel.save(newPost)
+                    viewModel.updateEditedPost(post.content)
                 }
             }
         }

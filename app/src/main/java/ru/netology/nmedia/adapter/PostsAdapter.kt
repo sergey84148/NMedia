@@ -1,8 +1,16 @@
 package ru.netology.nmedia.adapter
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -10,17 +18,19 @@ import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
 
+
+
 interface OnInteractionListener {
     fun onLike(post: Post) {}
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
-    //fun onCancelEdit(post: Post) {}
 }
 
 class PostsAdapter(
     private val onInteractionListener: OnInteractionListener,
 ) : ListAdapter<Post, PostViewHolder>(PostDiffCallback) {
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostViewHolder {
         val binding = CardPostBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return PostViewHolder(binding, onInteractionListener)
@@ -29,13 +39,35 @@ class PostsAdapter(
     override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
         val post = getItem(position)
         holder.bind(post)
+
+        // Обработка видео
+        if (post.video != null) {
+            holder.binding.videoContainer.visibility = View.VISIBLE
+            holder.binding.videoThumbnail.setOnClickListener { openVideo(holder.binding.root.context, post.video) }
+            holder.binding.playButton.setOnClickListener { openVideo(holder.binding.root.context, post.video) }
+        } else {
+            holder.binding.videoContainer.visibility = View.GONE
+        }
+    }
+
+    private fun openVideo(context: Context, videoUrl: String?) {
+        if (videoUrl != null) {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl))
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+            } else {
+                Toast.makeText(context, "Нет приложения для просмотра видео", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }
 
 class PostViewHolder(
-    private val binding: CardPostBinding,
+    internal val binding: CardPostBinding, // Сделайте binding internal или protected
     private val onInteractionListener: OnInteractionListener,
 ) : RecyclerView.ViewHolder(binding.root) {
+
+
 
     fun bind(post: Post) {
         binding.apply {
