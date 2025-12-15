@@ -43,7 +43,7 @@ class MainActivity : AppCompatActivity() {
         // Регистрация ожидаемого результата от NewPostActivity
         val newPostLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK && result.data != null) {
-                val newContent = result.data!!.getStringExtra(NewPostActivity.EXTRA_NEW_POST_CONTENT)
+                val newContent = result.data!!.getStringExtra(NewPostActivity.EXTRA_POST_CONTENT)
                 if (newContent != null) {
                     // Формируем новый пост и передаем его в ViewModel
                     val post = Post(
@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         val adapter = PostsAdapter(object : OnInteractionListener {
             override fun onEdit(post: Post) {
                 // Переход на экран редактирования
+                viewModel.edit(post)
                 val intent = Intent(this@MainActivity, NewPostActivity::class.java)
                 intent.putExtra(NewPostActivity.EXTRA_POST_CONTENT, post.content)
                 editPostLauncher.launch(intent)

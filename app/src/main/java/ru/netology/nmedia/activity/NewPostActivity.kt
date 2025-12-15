@@ -19,7 +19,6 @@ class NewPostActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_POST_CONTENT = "EXTRA_POST_CONTENT"
         const val RESULT_EDITED_POST = "RESULT_EDITED_POST"
-        const val EXTRA_NEW_POST_CONTENT = "EXTRA_NEW_POST_CONTENT"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
