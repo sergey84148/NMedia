@@ -16,4 +16,5 @@
     <string name="number_five">5</string>
     <string name="apps_not_found">No applications found</string>
     <string name="playButton">Play</string>
+    <string name="button_play">button_play</string>
 </resources>
