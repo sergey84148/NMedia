@@ -93,4 +93,5 @@ class PostRepositoryInMemoryImpl(
         val gson = Gson()
         val postsType: Type = object : TypeToken<List<Post>>() {}.type
     }
+
 }

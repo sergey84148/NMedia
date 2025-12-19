@@ -39,12 +39,14 @@ android {
 
 dependencies {
 
+    implementation("com.google.code.gson:gson:2.13.2")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.generativeai)
+    implementation(libs.androidx.tools.core)
     testImplementation(libs.junit)
     implementation(libs.gson)
     androidTestImplementation(libs.androidx.junit)
