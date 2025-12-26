@@ -24,11 +24,7 @@ class FeedFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val binding = FragmentFeedBinding.inflate(
-            inflater,
-            container,
-            false
-        )
+        val binding = FragmentFeedBinding.inflate(inflater, container, false)
 
         val adapter = PostsAdapter(object : OnInteractionListener {
             override fun onEdit(post: Post) {
@@ -49,11 +45,21 @@ class FeedFragment : Fragment() {
                     putExtra(Intent.EXTRA_TEXT, post.content)
                     type = "text/plain"
                 }
-
                 val shareIntent = Intent.createChooser(intent, getString(R.string.chooser_share_post))
                 startActivity(shareIntent)
             }
+
+            // Теперь открываем фрагмент вручную через FragmentManager
+            override fun onOpenPost(post: Post) {
+                // Открываем фрагмент с деталями поста вручную
+                val detailsFragment = PostDetailFragment.newInstance(post)
+                childFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container_view_tag, detailsFragment)
+                    .addToBackStack(null)
+                    .commit()
+            }
         })
+
         binding.list.adapter = adapter
         viewModel.data.observe(viewLifecycleOwner) { posts ->
             adapter.submitList(posts)

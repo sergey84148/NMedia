@@ -20,7 +20,7 @@ object StringArg: ReadWriteProperty<Bundle, String?> {
         value: String?
     ){
         thisRef.putString(property.name, value)
-        }
+    }
 
 
 }

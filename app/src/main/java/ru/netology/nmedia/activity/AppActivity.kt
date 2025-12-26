@@ -6,7 +6,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.navigation.findNavController
 import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.snackbar.BaseTransientBottomBar.LENGTH_INDEFINITE
 import com.google.android.material.snackbar.Snackbar
@@ -42,8 +41,8 @@ class AppActivity : AppCompatActivity() {
                 return@let
             }
             binding.navController.getFragment<NavHostFragment>().navController
-                R.id.action_feedFragment_to_newPostFragment
-                Bundle().apply { textArg = text }
+            R.id.action_feedFragment_to_newPostFragment
+            Bundle().apply { textArg = text }
 
         }
     }

@@ -19,7 +19,7 @@ class NewPostFragment : Fragment() {
         var Bundle.textArg: String? by StringArg
     }
 
-    
+
 
     override fun onCreateView(
         inflater: LayoutInflater,

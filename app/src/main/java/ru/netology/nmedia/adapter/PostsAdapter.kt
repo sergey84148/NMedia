@@ -6,9 +6,6 @@ import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
@@ -18,13 +15,12 @@ import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
 
-
-
 interface OnInteractionListener {
     fun onLike(post: Post) {}
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
+    fun onOpenPost(post: Post) {}
 }
 
 class PostsAdapter(
@@ -39,6 +35,11 @@ class PostsAdapter(
     override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
         val post = getItem(position)
         holder.bind(post)
+
+        // Добавляем обработчик клика
+        holder.itemView.setOnClickListener {
+            onInteractionListener.onOpenPost(post)
+        }
 
         // Обработка видео
         if (post.video != null) {
@@ -63,11 +64,9 @@ class PostsAdapter(
 }
 
 class PostViewHolder(
-    internal val binding: CardPostBinding, // Сделайте binding internal или protected
+    internal val binding: CardPostBinding,
     private val onInteractionListener: OnInteractionListener,
 ) : RecyclerView.ViewHolder(binding.root) {
-
-
 
     fun bind(post: Post) {
         binding.apply {
