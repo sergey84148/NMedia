@@ -5,15 +5,21 @@ pluginManagement {
                 includeGroupByRegex("com\\.android.*")
                 includeGroupByRegex("com\\.google.*")
                 includeGroupByRegex("androidx.*")
+                includeGroupByRegex("org\\.jetbrains.*")
             }
         }
         mavenCentral()
         gradlePluginPortal()
     }
 }
+
 plugins {
+    // Исключение ненужных плагинов
+    //id("org.jetbrains.kotlin.plugin.parcelize") apply false
+
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {

@@ -1,3 +1,5 @@
+package ru.netology.nmedia.fragment
+
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,7 +10,7 @@ import ru.netology.nmedia.dto.Post
 
 class PostDetailFragment : Fragment() {
 
-    // Объявляем переменную для binding
+    // Binding-переменная
     private var _binding: FragmentPostDetailBinding? = null
     private val binding get() = _binding!!
 
@@ -17,8 +19,7 @@ class PostDetailFragment : Fragment() {
 
         fun newInstance(post: Post): PostDetailFragment {
             val fragment = PostDetailFragment()
-            val args = Bundle()
-            args.putParcelable(ARG_POST_KEY, post)
+            val args = Bundle().apply { putParcelable(ARG_POST_KEY, post) }
             fragment.arguments = args
             return fragment
         }
@@ -36,17 +37,17 @@ class PostDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Получаем переданный пост из аргументов
+        // Получаем переданный объект Post из аргументов
         val post = arguments?.getParcelable<Post>(ARG_POST_KEY)
         post?.let {
-            // Отображаем детали поста
-            binding.postTitle.text = it.title // Предполагается, что у вас есть эти View в вашем FragmentPostDetailBinding
-            binding.postContent.text = it.content // Предполагается, что у вас есть эти View в вашем FragmentPostDetailBinding
+            // Привязываем данные к соответствующим View
+            binding.postTitle.text = it.author
+            //binding.postContent.text = it.content
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding = null // Очищаем binding при уничтожении представления фрагмента, чтобы избежать утечек памяти
+        _binding = null // Освобождаем память после уничтожения фрагмента
     }
 }
