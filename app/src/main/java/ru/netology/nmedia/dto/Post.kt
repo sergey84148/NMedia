@@ -3,18 +3,6 @@ package ru.netology.nmedia.dto
 import android.os.Parcel
 import android.os.Parcelable
 
-/**
- * Представляет собой сущность поста.
- *
- * @param id уникальный идентификатор поста
- * @param author автор поста
- * @param content основной текст поста
- * @param published дата публикации
- * @param likes количество лайков
- * @param shares количество шарингов
- * @param video ссылка на видео (может быть пустой)
- * @param likedByMe признак, что пост понравился пользователю
- */
 data class Post(
     val id: Long,
     val author: String,

@@ -20,7 +20,6 @@
             android:layout_marginBottom="@dimen/common_spacing"
             android:contentDescription="@string/description_post_author_avatar"
             android:src="@drawable/ic_netology_48dp"
-            app:layout_constraintBottom_toBottomOf="@id/header"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:srcCompat="@sample/posts.json/data/authorAvatar" />
@@ -35,7 +34,6 @@
             android:ellipsize="end"
             android:singleLine="true"
             app:layout_constraintBottom_toTopOf="@+id/published"
-            app:layout_constraintEnd_toStartOf="@id/menu"
             app:layout_constraintStart_toEndOf="@id/avatar"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_chainStyle="packed"
@@ -49,8 +47,6 @@
             android:layout_marginStart="@dimen/common_spacing"
             android:layout_marginEnd="@dimen/common_spacing"
             android:layout_marginBottom="@dimen/common_spacing"
-            app:layout_constraintBottom_toBottomOf="@id/header"
-            app:layout_constraintEnd_toStartOf="@id/menu"
             app:layout_constraintStart_toEndOf="@id/avatar"
             app:layout_constraintTop_toBottomOf="@id/author"
             tools:text="@sample/posts.json/data/published" />
@@ -67,8 +63,7 @@
             android:ellipsize="end"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/header"
-            tools:text="@sample/posts.json/data/title" />
+            app:layout_constraintTop_toBottomOf="@id/published" />
 
         <!-- Основной текст поста -->
         <TextView
@@ -83,8 +78,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/postTitle"
             tools:text="@sample/posts.json/data/content" />
-
-        <!-- Остальная часть интерфейса остаётся без изменений -->
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>
