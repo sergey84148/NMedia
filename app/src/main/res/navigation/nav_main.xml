@@ -10,18 +10,13 @@
         android:name="ru.netology.nmedia.fragment.FeedFragment"
         android:label="fragment_feed"
         tools:layout="@layout/fragment_feed">
-        <action
-            android:id="@+id/action_feedFragment_to_newPostFragment"
-            app:destination="@id/newPostFragment"
-            app:enterAnim="@android:anim/fade_in"
-            app:exitAnim="@android:anim/fade_out"
-            app:popEnterAnim="@android:anim/fade_in"
-            app:popExitAnim="@android:anim/fade_out" />
 
-        <!-- Новая связь для перехода на фрагмент с деталями поста -->
         <action
             android:id="@+id/action_feedFragment_to_postDetailFragment"
             app:destination="@id/postDetailFragment" />
+        <action
+            android:id="@+id/action_feedFragment_to_newPostFragment"
+            app:destination="@id/newPostFragment" />
     </fragment>
 
     <fragment
@@ -30,7 +25,6 @@
         android:label="fragment_new_post"
         tools:layout="@layout/fragment_new_post" />
 
-    <!-- Новый фрагмент с деталями поста -->
     <fragment
         android:id="@+id/postDetailFragment"
         android:name="ru.netology.nmedia.fragment.PostDetailFragment"
@@ -40,6 +34,9 @@
             android:name="post"
             app:argType="ru.netology.nmedia.dto.Post"
             app:nullable="false" />
+        <action
+            android:id="@+id/action_postDetailFragment_to_newPostFragment"
+            app:destination="@id/newPostFragment" />
     </fragment>
 
 </navigation>

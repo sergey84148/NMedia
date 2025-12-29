@@ -10,13 +10,11 @@ data class Post(
     val published: String,
     var likes: Int,
     var shares: Int,
+    val link: String?,
     val video: String? = null,
     var likedByMe: Boolean
 ) : Parcelable {
 
-    /**
-     * Конструктор для десериализации из Parcel.
-     */
     constructor(parcel: Parcel) : this(
         id = parcel.readLong(),
         author = parcel.readString()!!,
@@ -24,18 +22,13 @@ data class Post(
         published = parcel.readString()!!,
         likes = parcel.readInt(),
         shares = parcel.readInt(),
-        video = parcel.readString(), // nullable field
+        link = parcel.readString(),
+        video = parcel.readString(),
         likedByMe = parcel.readByte().toInt() != 0
     )
 
-    /**
-     * Обязательное описание содержания объекта.
-     */
     override fun describeContents(): Int = 0
 
-    /**
-     * Метод записи объекта в Parcel.
-     */
     override fun writeToParcel(dest: Parcel, flags: Int) {
         dest.writeLong(id)
         dest.writeString(author)
@@ -43,13 +36,11 @@ data class Post(
         dest.writeString(published)
         dest.writeInt(likes)
         dest.writeInt(shares)
+        dest.writeString(link)
         dest.writeString(video)
         dest.writeByte((if (likedByMe) 1 else 0).toByte())
     }
 
-    /**
-     * Креатор для воссоздания объекта из Parcel.
-     */
     companion object CREATOR : Parcelable.Creator<Post> {
         override fun createFromParcel(parcel: Parcel): Post = Post(parcel)
         override fun newArray(size: Int): Array<Post?> = arrayOfNulls(size)

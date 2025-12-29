@@ -15,14 +15,16 @@ import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
 
+// Интерфейс для обработки взаимодействий с элементами списка
 interface OnInteractionListener {
     fun onLike(post: Post) {}
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
-    fun onOpenPost(post: Post) {}
+    fun onOpenPost(post: Post) {} // Новое действие для открытия поста
 }
 
+// Адаптер для отображения постов
 class PostsAdapter(
     private val onInteractionListener: OnInteractionListener,
 ) : ListAdapter<Post, PostViewHolder>(PostDiffCallback) {
@@ -36,7 +38,7 @@ class PostsAdapter(
         val post = getItem(position)
         holder.bind(post)
 
-        // Добавляем обработчик клика
+        // Добавляем обработчик клика на весь элемент
         holder.itemView.setOnClickListener {
             onInteractionListener.onOpenPost(post)
         }
@@ -51,6 +53,7 @@ class PostsAdapter(
         }
     }
 
+    // Вспомогательная функция для открытия видео
     private fun openVideo(context: Context, videoUrl: String?) {
         if (videoUrl != null) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl))
@@ -63,6 +66,7 @@ class PostsAdapter(
     }
 }
 
+// Holder для элементов списка
 class PostViewHolder(
     internal val binding: CardPostBinding,
     private val onInteractionListener: OnInteractionListener,
@@ -108,7 +112,7 @@ class PostViewHolder(
         }
     }
 
-    // Форматирующая функция для числовых значений
+    // Форматируем число, чтобы оно выглядело компактно
     private fun formatNumber(value: Int): String {
         return when {
             value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0)
@@ -119,11 +123,9 @@ class PostViewHolder(
 }
 
 object PostDiffCallback : DiffUtil.ItemCallback<Post>() {
-    override fun areItemsTheSame(oldItem: Post, newItem: Post): Boolean {
-        return oldItem.id == newItem.id
-    }
+    override fun areItemsTheSame(oldItem: Post, newItem: Post): Boolean =
+        oldItem.id == newItem.id
 
-    override fun areContentsTheSame(oldItem: Post, newItem: Post): Boolean {
-        return oldItem == newItem
-    }
+    override fun areContentsTheSame(oldItem: Post, newItem: Post): Boolean =
+        oldItem == newItem
 }

@@ -1,6 +1,5 @@
 package ru.netology.nmedia.fragment
 
-
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -15,11 +14,11 @@ import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.databinding.FragmentFeedBinding
 import ru.netology.nmedia.dto.Post
-import ru.netology.nmedia.fragment.PostDetailFragment.Companion.ARG_POST_KEY
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class FeedFragment : Fragment() {
 
+    private lateinit var binding: FragmentFeedBinding
     private val viewModel: PostViewModel by viewModels(ownerProducer = ::requireParentFragment)
 
     override fun onCreateView(
@@ -27,7 +26,12 @@ class FeedFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val binding = FragmentFeedBinding.inflate(inflater, container, false)
+        binding = FragmentFeedBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
         val adapter = PostsAdapter(object : OnInteractionListener {
             override fun onEdit(post: Post) {
@@ -52,13 +56,12 @@ class FeedFragment : Fragment() {
                 startActivity(shareIntent)
             }
 
-            // Теперь открываем фрагмент вручную через FragmentManager
+            // Обработка клика на контент (открываем PostDetailFragment)
             override fun onOpenPost(post: Post) {
-                findNavController()
-                    .navigate(
-                        R.id.action_feedFragment_to_postDetailFragment,
-                        bundleOf(ARG_POST_KEY to post)
-                    )
+                findNavController().navigate(
+                    R.id.action_feedFragment_to_postDetailFragment,
+                    bundleOf(PostDetailFragment.ARG_POST_KEY to post)
+                )
             }
         })
 
@@ -70,7 +73,5 @@ class FeedFragment : Fragment() {
         binding.fab.setOnClickListener {
             findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
         }
-
-        return binding.root
     }
 }

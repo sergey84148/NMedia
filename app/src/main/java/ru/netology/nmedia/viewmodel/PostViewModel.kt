@@ -13,6 +13,7 @@ val emptyTemplate: Post = Post(
     published = "",
     likes = 0,
     shares = 0,
+    link = "",
     likedByMe = false
 )
 

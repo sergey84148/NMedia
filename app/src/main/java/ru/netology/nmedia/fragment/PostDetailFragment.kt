@@ -10,7 +10,6 @@ import ru.netology.nmedia.dto.Post
 
 class PostDetailFragment : Fragment() {
 
-    // Binding-переменная
     private var _binding: FragmentPostDetailBinding? = null
     private val binding get() = _binding!!
 
@@ -39,15 +38,16 @@ class PostDetailFragment : Fragment() {
 
         // Получаем переданный объект Post из аргументов
         val post = arguments?.getParcelable<Post>(ARG_POST_KEY)
-        post?.let {
-            // Привязываем данные к соответствующим View
-            binding.postTitle.text = it.author
-            //binding.postContent.text = it.content
+        if (post != null) {
+            // Заполняем соответствующие поля информацией из поста
+            binding.author.text = post.author
+            binding.content.text = post.content
+            binding.published.text = post.published
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding = null // Освобождаем память после уничтожения фрагмента
+        _binding = null
     }
 }

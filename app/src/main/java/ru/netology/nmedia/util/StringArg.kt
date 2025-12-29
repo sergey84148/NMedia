@@ -1,6 +1,5 @@
 package ru.netology.nmedia.util
 
-import android.R.attr.value
 import android.os.Bundle
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
