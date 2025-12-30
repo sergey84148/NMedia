@@ -21,7 +21,7 @@ interface OnInteractionListener {
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
-    fun onOpenPost(post: Post) {} // Новое действие для открытия поста
+    fun onOpenPost(post: Post) {}
 }
 
 // Адаптер для отображения постов
@@ -39,9 +39,12 @@ class PostsAdapter(
         holder.bind(post)
 
         // Добавляем обработчик клика на весь элемент
-        holder.itemView.setOnClickListener {
+        val detailsListener = View.OnClickListener {
             onInteractionListener.onOpenPost(post)
         }
+
+        holder.itemView.setOnClickListener(detailsListener)
+        holder.binding.content.setOnClickListener(detailsListener)
 
         // Обработка видео
         if (post.video != null) {

@@ -2,9 +2,11 @@ package ru.netology.nmedia.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.*
+import ru.netology.nmedia.dao.PostDaoImpl
+import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.repository.PostRepository
-import ru.netology.nmedia.repository.PostRepositoryInMemoryImpl
+import ru.netology.nmedia.repository.PostRepositorySQLiteImpl
 
 val emptyTemplate: Post = Post(
     id = 0,
@@ -13,12 +15,16 @@ val emptyTemplate: Post = Post(
     published = "",
     likes = 0,
     shares = 0,
-    link = "",
+    video = "" ,
+    link = "" ,
     likedByMe = false
+
 )
 
-class PostViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: PostRepository = PostRepositoryInMemoryImpl(application)
+ class PostViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: PostRepository = PostRepositorySQLiteImpl(
+        AppDb.getInstance(application).postDao
+    )
     val data: LiveData<List<Post>> = repository.getAll()
     private val edited = MutableLiveData<Post?>(emptyTemplate)
 
@@ -66,7 +72,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Отмена редактирования
-    fun onCancelEdit() {
+    fun onCancelEdit(id: Long) {
         edited.value = emptyTemplate
     }
 
