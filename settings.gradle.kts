@@ -14,7 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-enableFeaturePreview("VersionCatalog")
 
 rootProject.name = "NMedia"
 include(":app")

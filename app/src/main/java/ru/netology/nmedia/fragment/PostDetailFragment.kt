@@ -2,7 +2,6 @@ package ru.netology.nmedia.fragment
 
 import android.content.Intent
 import android.os.Bundle
-import android.telephony.PhoneNumberUtils.formatNumber
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -57,7 +56,6 @@ class PostDetailFragment : Fragment() {
                 binding.like.text = post.likes.toString()
                 binding.menu.setOnClickListener { showPopup(it, post) }
                 binding.share.setOnClickListener { share(post) }
-                binding.share.text = formatNumber(post.shares)
             } else {
                 findNavController().navigateUp()
             }

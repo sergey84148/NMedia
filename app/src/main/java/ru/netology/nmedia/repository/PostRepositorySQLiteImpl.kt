@@ -2,13 +2,12 @@ package ru.netology.nmedia.repository
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dto.Post
 
-
 class PostRepositorySQLiteImpl(
-    private val dao: Unit
+    private val dao: PostDao
 ) : PostRepository {
-
     private var posts = emptyList<Post>()
     private val data = MutableLiveData(posts)
 
@@ -18,6 +17,15 @@ class PostRepositorySQLiteImpl(
     }
 
     override fun getAll(): LiveData<List<Post>> = data
+    override fun shareById(id: Long) {
+        posts = posts.map { post ->
+            if (post.id == id) {
+                post.copy(shares = post.shares + 1)
+            } else post
+        }
+        data.value = posts
+    }
+
 
     override fun save(post: Post) {
         val id = post.id
@@ -47,16 +55,5 @@ class PostRepositorySQLiteImpl(
         dao.removeById(id)
         posts = posts.filter { it.id != id }
         data.value = posts
-    }
-
-    override fun shareById(id: Long) {
-        posts = posts.map {
-            if (it.id != id) it else it.copy(shares = it.shares + 1)
-        }
-        data.value = posts
-    }
-
-    override fun findLastEditedPost(): Post? {
-        return posts.lastOrNull()
     }
 }

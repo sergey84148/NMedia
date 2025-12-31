@@ -11,6 +11,5 @@ interface PostRepository {
     fun removeById(id: Long)
     fun shareById(id: Long)
 
-    fun onCancelEdit(post: Post)
     fun findLastEditedPost(): Post?
 }

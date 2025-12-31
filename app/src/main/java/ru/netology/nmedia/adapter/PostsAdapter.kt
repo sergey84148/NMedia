@@ -14,6 +14,9 @@ import androidx.recyclerview.widget.RecyclerView
 import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
+import ru.netology.nmedia.utils.Utils.formatNumber
+
+
 
 // Интерфейс для обработки взаимодействий с элементами списка
 interface OnInteractionListener {
@@ -69,7 +72,6 @@ class PostsAdapter(
     }
 }
 
-// Holder для элементов списка
 class PostViewHolder(
     internal val binding: CardPostBinding,
     private val onInteractionListener: OnInteractionListener,
@@ -115,14 +117,6 @@ class PostViewHolder(
         }
     }
 
-    // Форматируем число, чтобы оно выглядело компактно
-    private fun formatNumber(value: Int): String {
-        return when {
-            value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0)
-            value >= 1000 -> "%.1fK".format(value / 1000.0)
-            else -> "$value"
-        }
-    }
 }
 
 object PostDiffCallback : DiffUtil.ItemCallback<Post>() {
