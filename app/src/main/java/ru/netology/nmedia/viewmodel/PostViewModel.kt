@@ -26,7 +26,7 @@ val emptyTemplate: Post = Post(
      )
     val data: LiveData<List<Post>> = repository.getAll()
     private val edited = MutableLiveData<Post?>(emptyTemplate)
-
+/*
     // Наблюдательная переменная для результата редактирования
     val editedPost: LiveData<Post?> = edited
 
@@ -39,7 +39,7 @@ val emptyTemplate: Post = Post(
         }
         edited.value = emptyTemplate
     }
-
+*/
     // Метод для сохранения изменений
     fun save(content: String) {
         edited.value?.let {
@@ -65,10 +65,10 @@ val emptyTemplate: Post = Post(
     fun removeById(id: Long) {
         repository.removeById(id)
     }
-
+/*
     fun shareById(id: Long) {
         repository.shareById(id)
     }
-
+*/
 
 }
