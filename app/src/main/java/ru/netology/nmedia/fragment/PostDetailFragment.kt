@@ -2,7 +2,6 @@ package ru.netology.nmedia.fragment
 
 import android.content.Intent
 import android.os.Bundle
-import android.telephony.PhoneNumberUtils.formatNumber
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +12,7 @@ import androidx.navigation.fragment.findNavController
 import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.FragmentPostDetailBinding
 import ru.netology.nmedia.dto.Post
+import ru.netology.nmedia.utils.Utils
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class PostDetailFragment : Fragment() {
@@ -55,9 +55,10 @@ class PostDetailFragment : Fragment() {
                 binding.published.text = post.published
                 binding.like.isChecked = post.likedByMe
                 binding.like.text = post.likes.toString()
-                binding.menu.setOnClickListener { showPopup(it, post) }
+                binding.share.text = Utils.formatNumber(post.shares)
                 binding.share.setOnClickListener { share(post) }
-                binding.share.text = formatNumber(post.shares)
+
+                binding.menu.setOnClickListener { showPopup(it, post) }
             } else {
                 findNavController().navigateUp()
             }

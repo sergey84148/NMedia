@@ -6,7 +6,6 @@ import androidx.lifecycle.MutableLiveData
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import ru.netology.nmedia.dto.Post
-import java.io.File
 import java.lang.reflect.Type
 
 class PostRepositoryFileImpl(private val context: Context) : PostRepository {
@@ -68,11 +67,6 @@ class PostRepositoryFileImpl(private val context: Context) : PostRepository {
             } else post
         }
         data.value = posts
-    }
-
-    // Получаем последний редактированный пост
-    override fun findLastEditedPost(): Post? {
-        return posts.firstOrNull()
     }
 
     // Чтение данных из файла
