@@ -14,6 +14,7 @@ import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.databinding.FragmentFeedBinding
 import ru.netology.nmedia.dto.Post
+import ru.netology.nmedia.fragment.NewPostFragment.Companion.textArg
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class FeedFragment : Fragment() {
@@ -34,8 +35,15 @@ class FeedFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val adapter = PostsAdapter(object : OnInteractionListener {
+
             override fun onEdit(post: Post) {
                 viewModel.edit(post)
+                findNavController().navigate(
+                    R.id.action_feedFragment_to_newPostFragment,
+                    Bundle().apply {
+                        textArg = post.content
+                    },
+                )
             }
 
             override fun onLike(post: Post) {
@@ -48,6 +56,7 @@ class FeedFragment : Fragment() {
             }
 
             override fun onShare(post: Post) {
+                viewModel.shareById(post.id)
                 val intent = Intent().apply {
                     action = Intent.ACTION_SEND
                     putExtra(Intent.EXTRA_TEXT, post.content)

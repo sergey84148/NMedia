@@ -42,6 +42,7 @@ class PostDetailFragment : Fragment() {
         return binding.root
     }
 
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -57,13 +58,14 @@ class PostDetailFragment : Fragment() {
                 binding.like.text = post.likes.toString()
                 binding.share.text = Utils.formatNumber(post.shares)
                 binding.share.setOnClickListener { share(post) }
-
                 binding.menu.setOnClickListener { showPopup(it, post) }
+                binding.like.setOnClickListener { viewModel.likeById(post.id) }
             } else {
                 findNavController().navigateUp()
             }
         }
     }
+
 
     private fun showPopup(menuButton: View, post: Post) {
         val popupMenu = PopupMenu(requireContext(), menuButton)
@@ -89,7 +91,10 @@ class PostDetailFragment : Fragment() {
         popupMenu.show()
     }
 
+
+
     private fun share(post: Post) {
+        viewModel.shareById(post.id)
         val intent = Intent().apply {
             action = Intent.ACTION_SEND
             putExtra(Intent.EXTRA_TEXT, post.content)
@@ -103,4 +108,5 @@ class PostDetailFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
+
 }
