@@ -70,7 +70,7 @@ class FeedFragment : Fragment() {
             override fun onOpenPost(post: Post) {
                 findNavController().navigate(
                     R.id.action_feedFragment_to_postDetailFragment,
-                    bundleOf(PostDetailFragment.ARG_POST_KEY to post)
+                    bundleOf(PostDetailFragment.ARG_POST_ID to post.id)
                 )
             }
         })

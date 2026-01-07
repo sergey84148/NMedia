@@ -31,8 +31,8 @@
         android:label="fragment_post_detail"
         tools:layout="@layout/fragment_post_detail">
         <argument
-            android:name="post"
-            app:argType="ru.netology.nmedia.dto.Post"
+            android:name="postId"
+            app:argType="long"
             app:nullable="false" />
         <action
             android:id="@+id/action_postDetailFragment_to_newPostFragment"

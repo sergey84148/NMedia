@@ -12,7 +12,6 @@ import androidx.navigation.fragment.findNavController
 import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.FragmentPostDetailBinding
 import ru.netology.nmedia.dto.Post
-import ru.netology.nmedia.utils.Utils
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class PostDetailFragment : Fragment() {
@@ -21,14 +20,7 @@ class PostDetailFragment : Fragment() {
     private val binding get() = _binding!!
 
     companion object {
-        const val ARG_POST_KEY = "post_key"
-
-        fun newInstance(post: Post): PostDetailFragment {
-            val fragment = PostDetailFragment()
-            val args = Bundle().apply { putParcelable(ARG_POST_KEY, post) }
-            fragment.arguments = args
-            return fragment
-        }
+        const val ARG_POST_ID = "postId"
     }
 
     private val viewModel: PostViewModel by viewModels(ownerProducer = ::requireParentFragment)
@@ -42,30 +34,37 @@ class PostDetailFragment : Fragment() {
         return binding.root
     }
 
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val postId = arguments?.getParcelable<Post>(ARG_POST_KEY)?.id
+        // Получаем идентификатор поста из аргументов
+        val postId = arguments?.getLong(ARG_POST_ID)!!
 
+        // Наблюдаем за списком постов и выбираем нужный по идентификатору
         viewModel.data.observe(viewLifecycleOwner) { posts ->
             val post = posts.find { it.id == postId }
             if (post != null) {
-                binding.author.text = post.author
-                binding.content.text = post.content
-                binding.published.text = post.published
-                binding.like.isChecked = post.likedByMe
-                binding.like.text = post.likes.toString()
-                binding.share.text = Utils.formatNumber(post.shares)
-                binding.share.setOnClickListener { share(post) }
-                binding.menu.setOnClickListener { showPopup(it, post) }
-                binding.like.setOnClickListener { viewModel.likeById(post.id) }
+                bindPost(post)
             } else {
                 findNavController().navigateUp()
             }
         }
     }
 
+    private fun bindPost(post: Post) {
+        binding.apply {
+            author.text = post.author
+            content.text = post.content
+            published.text = post.published
+            like.isChecked = post.likedByMe
+            like.text = post.likes.toString()
+            share.text = post.shares.toString()
+
+            share.setOnClickListener { share(post) }
+            menu.setOnClickListener { showPopup(it, post) }
+            like.setOnClickListener { viewModel.likeById(post.id) }
+        }
+    }
 
     private fun showPopup(menuButton: View, post: Post) {
         val popupMenu = PopupMenu(requireContext(), menuButton)
@@ -91,8 +90,6 @@ class PostDetailFragment : Fragment() {
         popupMenu.show()
     }
 
-
-
     private fun share(post: Post) {
         viewModel.shareById(post.id)
         val intent = Intent().apply {
@@ -108,5 +105,4 @@ class PostDetailFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
-
 }
