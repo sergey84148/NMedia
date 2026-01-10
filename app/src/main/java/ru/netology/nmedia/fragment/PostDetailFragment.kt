@@ -12,6 +12,7 @@ import androidx.navigation.fragment.findNavController
 import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.FragmentPostDetailBinding
 import ru.netology.nmedia.dto.Post
+import ru.netology.nmedia.utils.Utils
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class PostDetailFragment : Fragment() {
@@ -58,7 +59,14 @@ class PostDetailFragment : Fragment() {
             published.text = post.published
             like.isChecked = post.likedByMe
             like.text = post.likes.toString()
-            share.text = post.shares.toString()
+            share.text = Utils.formatNumber(post.shares)
+
+            // Показываем видео-контент только если оно доступно
+            videoContainer.visibility =
+                if (post.video != null && post.video.isNotEmpty())
+                    View.VISIBLE
+                else
+                    View.GONE
 
             share.setOnClickListener { share(post) }
             menu.setOnClickListener { showPopup(it, post) }

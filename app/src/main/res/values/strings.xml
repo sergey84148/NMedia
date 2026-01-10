@@ -17,4 +17,8 @@
     <string name="apps_not_found">No applications found</string>
     <string name="playButton">Play</string>
     <string name="button_play">button_play</string>
+    <string name="google_play_unavailable">Google Api Unavailable</string>
+    <string name="notification_user_liked">User %1$s liked %2$s\'s post</string>
+    <string name="channel_remote_name">Server notifications</string>
+    <string name="channel_remote_description">Notifications from remote server</string>
 </resources>
