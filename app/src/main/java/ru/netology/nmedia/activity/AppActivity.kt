@@ -18,7 +18,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.messaging.FirebaseMessaging
 import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.ActivityAppBinding
-import ru.netology.nmedia.fragment.NewPostFragment.Companion.textArg
+//import ru.netology.nmedia.fragment.NewPostFragment.Companion.textArg
 
 class AppActivity : AppCompatActivity() {
 
@@ -54,7 +54,7 @@ class AppActivity : AppCompatActivity() {
             findNavController(R.id.newPostFragment).navigate(
                 R.id.action_feedFragment_to_newPostFragment,
                 Bundle().apply {
-                    textArg = text
+                   // textArg = text
                 }
             )
         }
