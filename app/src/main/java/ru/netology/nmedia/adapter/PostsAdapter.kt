@@ -21,6 +21,7 @@ import ru.netology.nmedia.utils.Utils.formatNumber
 // Интерфейс для обработки взаимодействий с элементами списка
 interface OnInteractionListener {
     fun onLike(post: Post) {}
+
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}

@@ -3,9 +3,10 @@ package ru.netology.nmedia.repository
 import ru.netology.nmedia.dto.Post
 
 interface PostRepository {
-    fun getAll(): List<Post>
+    suspend fun getAll(): List<Post>
     suspend fun likeById(id: Long): Post
-    fun save(post: Post): Post
-    fun removeById(id: Long)
-    fun shareById(id: Long)
+    suspend fun dislikeById(id: Long): Post
+    suspend fun save(post: Post): Post
+    suspend fun removeById(id: Long)
+    suspend fun shareById(id: Long): Post
 }
