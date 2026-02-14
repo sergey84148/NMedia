@@ -52,14 +52,16 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     fun load() = viewModelScope.launch(Dispatchers.IO) {
         _data.postValue(FeedModel(loading = true))
+        repository.getAllAsync(object : PostRepository.GetAllCallback {
+            override fun onSuccess(posts: List<Post>) {
+                _data.postValue(FeedModel(posts, posts.isEmpty()))
+            }
 
-        try {
-            val posts = repository.getAll()
-            _data.postValue(FeedModel(posts = posts, empty = posts.isEmpty()))
-        } catch (e: Exception) {
-            Log.e("PostViewModel", "Load failed", e)
-            _data.postValue(FeedModel(error = true))
-        }
+            override fun onError(e: Exception) {
+                _data.postValue(FeedModel(error = true))
+            }
+        })
+
     }
 
     /**

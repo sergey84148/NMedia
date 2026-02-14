@@ -9,4 +9,10 @@ interface PostRepository {
     suspend fun save(post: Post): Post
     suspend fun removeById(id: Long)
     suspend fun shareById(id: Long): Post
+    suspend fun getAllAsync(callback: GetAllCallback)
+
+    interface GetAllCallback {
+        fun onSuccess(posts: List<Post>)
+        fun onError(e: Exception)
+    }
 }
