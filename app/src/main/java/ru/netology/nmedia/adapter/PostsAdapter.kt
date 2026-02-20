@@ -15,6 +15,9 @@ import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.utils.Utils.formatNumber
+import ru.netology.nmedia.util.ImageLoader
+
+
 
 
 
@@ -87,6 +90,8 @@ class PostViewHolder(
             like.isChecked = post.likedByMe
             like.text = post.likes.toString()
             share.text = formatNumber(post.shares)
+
+            ImageLoader.loadAvatar(itemView.context, post.authorAvatar, avatar)
 
             menu.setOnClickListener {
                 PopupMenu(it.context, it).apply {
