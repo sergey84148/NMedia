@@ -17,14 +17,9 @@ import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.utils.Utils.formatNumber
 import ru.netology.nmedia.util.ImageLoader
 
-
-
-
-
 // Интерфейс для обработки взаимодействий с элементами списка
 interface OnInteractionListener {
     fun onLike(post: Post) {}
-
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
@@ -60,6 +55,19 @@ class PostsAdapter(
             holder.binding.playButton.setOnClickListener { openVideo(holder.binding.root.context, post.video) }
         } else {
             holder.binding.videoContainer.visibility = View.GONE
+        }
+
+        // Обработка вложения (attachment)
+        if (post.attachment != null) {
+            holder.binding.attachmentContainer.visibility = View.VISIBLE
+            ImageLoader.loadPostAttachment(
+                context = holder.binding.root.context,
+                attachment = post.attachment,
+                imageView = holder.binding.attachmentImage
+            )
+            holder.binding.attachmentDescription.text = post.attachment.description
+        } else {
+            holder.binding.attachmentContainer.visibility = View.GONE
         }
     }
 
@@ -122,7 +130,6 @@ class PostViewHolder(
             }
         }
     }
-
 }
 
 object PostDiffCallback : DiffUtil.ItemCallback<Post>() {

@@ -18,14 +18,15 @@ import ru.netology.nmedia.util.SingleLiveEvent
 val emptyTemplate: Post = Post(
     id = 0,
     author = "",
-    authorAvatar = "",
+    authorAvatar = null,
     content = "",
     published = "",
     likes = 0,
     shares = 0,
-    video = "",
+    video = null,
     link = "",
-    likedByMe = false
+    likedByMe = false,
+    attachment = null
 )
 
 class PostViewModel(application: Application) : AndroidViewModel(application) {
@@ -48,27 +49,19 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-     // Загружает список постов с сервера.
-     // Устанавливает состояние loading = true до завершения запроса.
-
-    fun load() = viewModelScope.launch(Dispatchers.IO) {
-        _data.postValue(FeedModel(loading = true))
+    fun load() {
+        _data.value = FeedModel(loading = true)
         repository.getAllAsync(object : PostRepository.GetAllCallback {
             override fun onSuccess(posts: List<Post>) {
-                _data.postValue(FeedModel(posts, posts.isEmpty()))
+                _data.value = FeedModel(posts = posts, empty = posts.isEmpty())
             }
 
-            override fun onError(e: Exception) {
-                _data.postValue(FeedModel(error = true))
+            override fun onError(e: Throwable) {
+                _data.value = FeedModel(error = true)
             }
         })
-
     }
 
-    /**
-     * Сохраняет изменения поста (создание или редактирование).
-     * Если контент не изменился — действие не выполняется.
-     */
     fun save(content: String) = viewModelScope.launch(Dispatchers.IO) {
         edited.value?.let { post ->
             val trimmedContent = content.trim()
@@ -90,17 +83,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         edited.postValue(emptyTemplate)
     }
 
-    /**
-     * Переводит пост в режим редактирования.
-     */
+
     fun edit(post: Post) {
         edited.value = post
     }
 
-    /**
-     * Ставит или снимает лайк на посте.
-     * Отправляет запрос на сервер и обновляет локальный кэш.
-     */
     fun toggleLike(post: Post) = viewModelScope.launch(Dispatchers.IO) {
         try {
             // Отправляем запрос на сервер
@@ -119,10 +106,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Удаляет пост по ID.
-     * Обновляет локальный список и состояние empty.
-     */
     fun removeById(id: Long) = viewModelScope.launch(Dispatchers.IO) {
         try {
             repository.removeById(id)
@@ -139,10 +122,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Увеличивает счётчик shares у поста.
-     * Обновляет локальный кэш после успешного запроса.
-     */
+
     fun shareById(id: Long) = viewModelScope.launch(Dispatchers.IO) {
         try {
             repository.shareById(id)

@@ -6,6 +6,7 @@
     android:layout_height="wrap_content"
     android:padding="@dimen/common_spacing">
 
+
     <ImageView
         android:id="@+id/avatar"
         android:layout_width="@dimen/posts_avatar_size"
@@ -76,15 +77,44 @@
         app:layout_constraintTop_toBottomOf="@id/header"
         tools:text="@sample/posts.json/data/content" />
 
+
+    <LinearLayout
+        android:id="@+id/attachmentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/common_spacing"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/content">
+
+
+        <ImageView
+            android:id="@+id/attachmentImage"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:scaleType="centerCrop"/>
+        <TextView
+            android:id="@+id/attachmentDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:textSize="14sp"
+            android:textColor="#666"
+            tools:text="Описание вложения" />
+    </LinearLayout>
+
     <LinearLayout
         android:id="@+id/video_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:visibility="gone"
         android:orientation="vertical"
-        app:layout_constraintTop_toBottomOf="@id/content"
+        app:layout_constraintTop_toBottomOf="@id/attachmentContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
+
 
         <ImageView
             android:id="@+id/videoThumbnail"
@@ -103,12 +133,13 @@
             android:text="@string/playButton" />
     </LinearLayout>
 
+
     <androidx.constraintlayout.widget.Barrier
         android:id="@+id/footer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:barrierDirection="bottom"
-        app:constraint_referenced_ids="content,video_container" />
+        app:constraint_referenced_ids="content,attachmentContainer,video_container" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/like"
@@ -123,6 +154,7 @@
         app:icon="@drawable/ic_like_selector"
         tools:checked="false"/>
 
+
     <TextView
         android:id="@+id/likeCount"
         android:layout_width="wrap_content"
@@ -131,6 +163,7 @@
         app:layout_constraintStart_toEndOf="@+id/like"
         app:layout_constraintTop_toBottomOf="@id/footer"
         tools:text="10" />
+
 
     <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/share"
@@ -143,13 +176,13 @@
         app:layout_constraintTop_toBottomOf="@id/footer"
         android:button="@drawable/ic_share_24" />
 
+
     <ImageButton
         android:id="@+id/views"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/common_spacing"
         android:background="@android:color/transparent"
-        android:contentDescription="@string/description_post_share"
         app:layout_constraintEnd_toStartOf="@id/viewsCount"
         app:layout_constraintTop_toBottomOf="@id/footer"
         app:srcCompat="@drawable/ic_views_24" />

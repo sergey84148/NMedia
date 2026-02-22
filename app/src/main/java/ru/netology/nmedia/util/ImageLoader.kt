@@ -5,7 +5,9 @@ import android.widget.ImageView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import android.util.Log
+import android.view.View
 import ru.netology.nmedia.R
+import ru.netology.nmedia.dto.Attachment
 
 object ImageLoader {
     private const val BASE_URL = "http://10.0.2.2:9999"
@@ -27,5 +29,25 @@ object ImageLoader {
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .circleCrop()
             .into(imageView)
+    }
+
+
+    fun loadPostAttachment(context: Context, attachment: Attachment?, imageView: ImageView) {
+        // Если вложение отсутствует или URL не указан — скрываем изображение
+        if (attachment == null || attachment.url.isNullOrEmpty()) {
+            imageView.visibility = View.GONE
+            return
+        }
+
+        Log.d("ImageLoader", "Loading post attachment from: ${attachment.url}")
+
+        Glide.with(context)
+            .load(attachment.url)
+            .placeholder(R.drawable.ic_loading_100dp)
+            .error(R.drawable.ic_error_100dp)
+            .timeout(10000)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .into(imageView)
+            .clearOnDetach()
     }
 }
