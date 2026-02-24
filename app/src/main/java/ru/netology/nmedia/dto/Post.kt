@@ -1,19 +1,23 @@
 package ru.netology.nmedia.dto
 
 import kotlinx.serialization.Serializable
-
+import ru.netology.nmedia.enumeration.AttachmentType
 
 @Serializable
 data class Post(
     val id: Long,
     val author: String,
-    val authorAvatar: String?,
     val content: String,
-    val published: String,
-    var likes: Int = 0,
-    var shares: Int = 0,
-    val video: String? = null,
-    val link: String = "",
-    var likedByMe: Boolean = false,
+    val publishedAt: Long,
+    val likesCount: Int = 0,
+    val sharesCount: Int = 0,
+    val isLikedByCurrentUser: Boolean = false,
     val attachment: Attachment? = null
+)
+
+@Serializable
+data class Attachment(
+    val url: String,
+    val description: String?,
+    val type: AttachmentType,
 )

@@ -48,6 +48,7 @@ android {
 dependencies {
     implementation(libs.glide)
     implementation(libs.cronet.embedded)
+    implementation(libs.play.services.fido)
     annotationProcessor(libs.glide.compiler)
 
     implementation(libs.converter.gson)
