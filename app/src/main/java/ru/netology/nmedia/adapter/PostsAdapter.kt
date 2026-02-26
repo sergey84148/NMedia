@@ -16,6 +16,7 @@ import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.utils.Utils.formatNumber
 import ru.netology.nmedia.util.ImageLoader
+import androidx.core.net.toUri
 
 // Интерфейс для обработки взаимодействий с элементами списка
 interface OnInteractionListener {
@@ -47,7 +48,7 @@ class PostsAdapter(
 
         holder.itemView.setOnClickListener(detailsListener)
         holder.binding.content.setOnClickListener(detailsListener)
-
+/*
         // Обработка видео
         if (post.video != null) {
             holder.binding.videoContainer.visibility = View.VISIBLE
@@ -56,7 +57,7 @@ class PostsAdapter(
         } else {
             holder.binding.videoContainer.visibility = View.GONE
         }
-
+*/
         // Обработка вложения (attachment)
         if (post.attachment != null) {
             holder.binding.attachmentContainer.visibility = View.VISIBLE
@@ -65,7 +66,7 @@ class PostsAdapter(
                 attachment = post.attachment,
                 imageView = holder.binding.attachmentImage
             )
-            holder.binding.attachmentDescription.text = post.attachment.description
+            holder.binding.attachmentDescription.text = post.attachment!!.description
         } else {
             holder.binding.attachmentContainer.visibility = View.GONE
         }
@@ -74,7 +75,7 @@ class PostsAdapter(
     // Вспомогательная функция для открытия видео
     private fun openVideo(context: Context, videoUrl: String?) {
         if (videoUrl != null) {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl))
+            val intent = Intent(Intent.ACTION_VIEW, videoUrl.toUri())
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
             } else {

@@ -2,7 +2,6 @@ package ru.netology.nmedia.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import ru.netology.nmedia.dto.Attachment
 import ru.netology.nmedia.dto.Post
 
 @Entity(tableName = "PostEntity")  // Явно указываем имя таблицы
@@ -18,7 +17,6 @@ data class PostEntity(
     val video: String? = null,
     val link: String = "",
     var likedByMe: Boolean = false
-    // attachment исключен из БД
 ) {
     fun toDto() = Post(
         id = id,
@@ -26,12 +24,11 @@ data class PostEntity(
         authorAvatar = authorAvatar,
         content = content,
         published = published,
-        likes = likes,
+        likedByMe = likedByMe,
         shares = shares,
         video = video,
         link = link,
-        attachment = null,  // attachment не сохраняется
-        likedByMe = likedByMe
+        likes = likes,
     )
 
     companion object {
