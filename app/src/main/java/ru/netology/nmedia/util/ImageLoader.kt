@@ -7,8 +7,9 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import android.util.Log
 import android.view.View
 import ru.netology.nmedia.R
+import ru.netology.nmedia.api.BASE_URL
 import ru.netology.nmedia.dto.Attachment
-import ru.netology.nmedia.Constants.BASE_URL
+
 
 object ImageLoader {
 
@@ -18,7 +19,7 @@ object ImageLoader {
             return
         }
 
-        val avatarUrl = "$BASE_URL/avatars/$avatarName"
+        val avatarUrl = "http://10.0.2.2:9999/avatars/$avatarName"
         Log.d("ImageLoader", "Loading avatar from: $avatarUrl")
 
         Glide.with(context)

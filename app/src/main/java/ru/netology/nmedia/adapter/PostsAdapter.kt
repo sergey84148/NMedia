@@ -93,12 +93,10 @@ class PostViewHolder(
     fun bind(post: Post) {
         binding.apply {
             author.text = post.author
-            published.text = post.published
             content.text = post.content
 
             like.isChecked = post.likedByMe
             like.text = post.likes.toString()
-            share.text = formatNumber(post.shares)
 
             ImageLoader.loadAvatar(itemView.context, post.authorAvatar, avatar)
 
@@ -127,7 +125,6 @@ class PostViewHolder(
 
             share.setOnClickListener {
                 onInteractionListener.onShare(post)
-                share.text = formatNumber(post.shares)
             }
         }
     }

@@ -2,10 +2,13 @@ package ru.netology.nmedia.dao
 
 import androidx.lifecycle.LiveData
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy.Companion.REPLACE
 import androidx.room.Query
+import androidx.room.Update
 import ru.netology.nmedia.entity.PostEntity
+import ru.netology.nmedia.enumeration.SyncState
 
 @Dao
 interface PostDao {
@@ -35,7 +38,7 @@ interface PostDao {
     suspend fun likeById(id: Long)
 
     @Query("DELETE FROM PostEntity WHERE id = :id")
-   suspend fun removeById(id: Long)
+    suspend fun removeById(id: Long)
 
     @Query(
         """
@@ -44,8 +47,44 @@ interface PostDao {
         WHERE id = :id
         """
     )
-   suspend fun shareById(id: Long)
+    suspend fun shareById(id: Long)
 
     @Query("SELECT * FROM PostEntity ORDER BY id DESC LIMIT 1")
     suspend fun findLastEditedPost(): PostEntity?
+
+    // ========== МЕТОДЫ ДЛЯ ПОИСКА ==========
+
+    // 👇 НОВЫЙ МЕТОД - поиск по локальному ID
+    @Query("SELECT * FROM PostEntity WHERE id = :id")
+    suspend fun getById(id: Long): PostEntity?
+
+    // ========== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ ==========
+
+    @Query("SELECT * FROM PostEntity WHERE syncState = :state")
+    suspend fun getPostsBySyncState(state: SyncState): List<PostEntity>
+
+    @Query("SELECT * FROM PostEntity WHERE serverId = :serverId")
+    suspend fun getPostByServerId(serverId: Long): PostEntity?
+
+    @Query("SELECT * FROM PostEntity WHERE syncState IN (:states)")
+    suspend fun getPostsBySyncStates(states: List<SyncState>): List<PostEntity>
+
+    @Query("SELECT MAX(lastModified) FROM PostEntity")
+    suspend fun getLastSyncTime(): Long?
+
+    @Update
+    suspend fun update(post: PostEntity)
+
+    @Update
+    suspend fun updateAll(posts: List<PostEntity>)
+
+    @Query("DELETE FROM PostEntity WHERE serverId = :serverId")
+    suspend fun deleteByServerId(serverId: Long)
+
+    @Query("UPDATE PostEntity SET syncState = :newState WHERE id = :id")
+    suspend fun updateSyncState(id: Long, newState: SyncState)
+
+    // Метод delete
+    @Delete
+    suspend fun delete(post: PostEntity)
 }
