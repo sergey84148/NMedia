@@ -8,9 +8,9 @@ import android.util.Log
 import android.view.View
 import ru.netology.nmedia.R
 import ru.netology.nmedia.dto.Attachment
+import ru.netology.nmedia.Constants.BASE_URL
 
 object ImageLoader {
-    private const val BASE_URL = "http://10.0.2.2:9999"
 
     fun loadAvatar(context: Context, avatarName: String?, imageView: ImageView) {
         if (avatarName.isNullOrEmpty()) {

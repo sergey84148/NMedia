@@ -9,6 +9,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.snackbar.Snackbar
 import ru.netology.nmedia.R
 import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.PostsAdapter
@@ -67,22 +68,29 @@ class FeedFragment : Fragment() {
 
         // Обработчик свайпа вниз для обновления
         binding.swipeRefreshLayout.setOnRefreshListener {
-            viewModel.load()
+            viewModel.loadPosts()
         }
 
         // Наблюдение за состоянием данных
         viewModel.data.observe(viewLifecycleOwner) { state ->
             adapter.submitList(state.posts)
+            if (state.empty) {
+                Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
+                    .show()
+            }
+        }
+
+        viewModel.state.observe(viewLifecycleOwner) { state ->
             binding.progress.isVisible = state.loading
-            binding.errorGroup.isVisible = state.error
-            binding.empty.isVisible = state.empty
-            // Управление индикатором SwipeRefreshLayout
-            binding.swipeRefreshLayout.isRefreshing = state.loading
+            if (state.error) {
+                Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
+                    .show()
+            }
         }
 
         // Кнопка "Повторить" при ошибке
         binding.retry.setOnClickListener {
-            viewModel.load()
+            viewModel.loadPosts()
         }
 
         // Кнопка FAB для создания нового поста

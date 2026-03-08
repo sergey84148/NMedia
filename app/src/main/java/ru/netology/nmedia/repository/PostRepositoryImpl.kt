@@ -1,66 +1,44 @@
 package ru.netology.nmedia.repository
 
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import androidx.lifecycle.*
 import ru.netology.nmedia.api.PostsApi
+import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dto.Post
-import java.lang.RuntimeException
+import ru.netology.nmedia.entity.PostEntity
 
-class PostRepositoryImpl : PostRepository {
-    override fun getAll(): List<Post> =
-        PostsApi.service.getAll()
-            .execute()
-            .body()
-            .orEmpty()
 
-    override fun getAllAsync(callback: PostRepository.GetAllCallback) {
-        PostsApi.service.getAll()
-            .enqueue(object : Callback<List<Post>> {
-                override fun onResponse(
-                    call: retrofit2.Call<List<Post>>,
-                    response: Response<List<Post>>
-                ) {
-                    if (response.isSuccessful) {
-                        callback.onSuccess(response.body().orEmpty())
-                    } else {
-                        callback.onError(
-                            RuntimeException(response.errorBody()?.string().orEmpty())
-                        )
-                    }
-                }
-
-                override fun onFailure(call: Call<List<Post>>?, t: Throwable) {
-                    callback.onError(t)
-                }
-            })
+class PostRepositoryImpl(
+    private val dao: PostDao,
+) : PostRepository {
+    override val data: LiveData<List<Post>> = dao.getAll().map { posts ->
+        posts.map { it.toDto() }
     }
 
-    override fun save(post: Post): Post {
-        return PostsApi.service.save(post)
-            .execute()
-            .body() ?: throw RuntimeException("Failed to save post")
+    override suspend fun getAllAsync() {
+        val posts: List<Post> = PostsApi.retrofitService.getAll()
+
+        dao.insert(posts.map ( PostEntity::fromDto))
     }
 
-    override fun removeById(id: Long) {
-        PostsApi.service.removeById(id)
-            .execute()
-    }
 
-    override fun likeById(id: Long): Post {
-        return PostsApi.service.likeById(id)
-            .execute()
-            .body() ?: throw RuntimeException("Failed to like post")
-    }
+    override suspend fun likeById(id: Long): Post =
+        PostsApi.retrofitService.likeById(id)
 
-    override fun dislikeById(id: Long): Post {
-        return PostsApi.service.dislikeById(id)
-            .execute()
-            .body() ?: throw RuntimeException("Failed to dislike post")
-    }
 
-    override fun shareById(id: Long): Post {
-        // Для реализации share нужно добавить соответствующий API-метод
-        throw NotImplementedError("Share functionality not implemented")
-    }
+    override suspend fun dislikeById(id: Long): Post =
+        PostsApi.retrofitService.dislikeById(id)
+
+
+    override suspend fun save(post: Post): Post =
+        PostsApi.retrofitService.save(post)
+
+
+    override suspend fun removeById(id: Long) =
+        PostsApi.retrofitService.removeById(id)
+
+
+    override suspend fun shareById(id: Long): Post =
+        PostsApi.retrofitService.shareById(id)
+
+
 }

@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.implementation
 
 plugins {
     alias(libs.plugins.android.application)
@@ -55,6 +56,9 @@ dependencies {
     implementation(libs.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
 
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+
+
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
@@ -69,6 +73,7 @@ dependencies {
     implementation(libs.generativeai)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+
 
     implementation(libs.moshi.kotlin)
     ksp(libs.moshi.kotlin.codegen)

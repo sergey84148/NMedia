@@ -22,4 +22,8 @@
     <string name="notification_user_liked">%1$s поставил лайк посту %2$s</string>
     <string name="channel_remote_name">Уведомления с сервера</string>
     <string name="channel_remote_description">Уведомления с удалённого сервера</string>
+    <string name="no_posts">Нет записей</string>
+    <string name="network_error">ошибка сети</string>
+    <string name="retry">повторить</string>
+    <string name="error_loading">ошибка загрузки</string>
 </resources>

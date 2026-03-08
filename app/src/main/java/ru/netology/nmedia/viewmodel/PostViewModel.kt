@@ -2,21 +2,19 @@ package ru.netology.nmedia.viewmodel
 
 import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.model.FeedModel
+import ru.netology.nmedia.model.FeedModelState
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.repository.PostRepositoryImpl
 import ru.netology.nmedia.util.SingleLiveEvent
 
-// Шаблон пустого поста для редактирования
 val emptyTemplate: Post = Post(
-    id = 0,
+    id = 0L,
     author = "",
     authorAvatar = "",
     content = "",
@@ -28,59 +26,59 @@ val emptyTemplate: Post = Post(
 )
 
 class PostViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: PostRepository = PostRepositoryImpl(
+        AppDb.getInstance(application).postDao()
+    )
 
-    private val repository: PostRepository = PostRepositoryImpl()
+    private val _state = MutableLiveData<FeedModelState>()
+    val state: LiveData<FeedModelState>
+        get() = _state
 
-    // Основное состояние ленты постов
-    private val _data = MutableLiveData<FeedModel>()
-    val data: LiveData<FeedModel> get() = _data
+    val data: LiveData<FeedModel> = repository.data.map {
+        FeedModel(it, it.isEmpty())
+    }
 
     // Текущий редактируемый пост
     val edited = MutableLiveData<Post>(emptyTemplate)
 
-    // Событие: пост успешно создан/обновлён
+    // Событие: пост успешно создан/обновлен
     private val _postCreated = SingleLiveEvent<Unit>()
-    val postCreated: LiveData<Unit> get() = _postCreated
+    val postCreated: LiveData<Unit>
+        get() = _postCreated
 
     init {
-        load()
+        loadPosts()
     }
 
-
-    fun load() {
-        _data.value = FeedModel(loading = true)
-        repository.getAllAsync(object : PostRepository.GetAllCallback {
-            override fun onSuccess(posts: List<Post>) {
-                _data.value = FeedModel(posts = posts, empty = posts.isEmpty())
+    fun loadPosts() {
+        _state.value = FeedModelState(loading = true)
+        viewModelScope.launch {
+            try {
+                repository.getAllAsync()
+                _state.value = FeedModelState()
+            } catch (_: Exception) {
+                _state.value = FeedModelState(error = true)
+                Log.e("PostViewModel", "Load posts error:")
             }
-
-            override fun onError(e: Throwable) {
-                _data.value = FeedModel(error = true)
-            }
-        })
+        }
     }
 
-    fun save(content: String) = viewModelScope.launch(Dispatchers.IO) {
+    fun save(content: String) =
+        viewModelScope.launch(Dispatchers.IO) {
         edited.value?.let { post ->
             val trimmedContent = content.trim()
-
-            if (post.content != trimmedContent) {
+            if (trimmedContent.isNotBlank()) {
                 try {
                     val updatedPost = repository.save(post.copy(content = trimmedContent))
                     _postCreated.postValue(Unit)
-
-                    // Обновляем пост в локальном списке
-                    updateLocalPost(updatedPost)
                 } catch (e: Exception) {
-                    Log.e("PostViewModel", "Save failed", e)
+                    Log.e("PostViewModel", "Save post error:", e)
                 }
             }
         }
-
         // Сбрасываем редактируемый пост
         edited.postValue(emptyTemplate)
     }
-
 
     fun edit(post: Post) {
         edited.value = post
@@ -88,58 +86,25 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleLike(post: Post) = viewModelScope.launch(Dispatchers.IO) {
         try {
-            // Отправляем запрос на сервер
             val updatedPost = if (post.likedByMe) {
                 repository.dislikeById(post.id)
             } else {
                 repository.likeById(post.id)
             }
-
-            // Обновляем локальный список только после успешного ответа
-            updateLocalPost(updatedPost)
         } catch (e: Exception) {
-            Log.e("PostViewModel", "Toggle like failed", e)
-            // При ошибке можно перезагрузить данные
-            load()
+            Log.e("PostViewModel", "Toggle like error:", e)
         }
     }
 
     fun removeById(id: Long) = viewModelScope.launch(Dispatchers.IO) {
         try {
             repository.removeById(id)
-
-            // Удаляем пост из локального списка
-            _data.postValue(_data.value?.copy(
-                posts = _data.value?.posts?.filter { it.id != id } ?: emptyList(),
-                empty = (_data.value?.posts?.isEmpty() ?: true)
-            ))
         } catch (e: Exception) {
-            Log.e("PostViewModel", "Remove failed", e)
-            _data.postValue(_data.value?.copy(error = true))
-            load() // Перезагрузка при ошибке
+            Log.e("PostViewModel", "Remove post error:", e)
         }
     }
 
 
-    fun shareById(id: Long) = viewModelScope.launch(Dispatchers.IO) {
-        try {
-            repository.shareById(id)
 
-            // Получаем актуальный пост после увеличения shares
-            val updatedPosts = repository.getAll()
-            _data.postValue(FeedModel(posts = updatedPosts, empty = updatedPosts.isEmpty()))
-        } catch (e: Exception) {
-            Log.e("PostViewModel", "Share failed", e)
-            load() // Перезагрузка при ошибке
-        }
-    }
 
-    // Вспомогательный метод для обновления локального поста в списке
-    private fun updateLocalPost(updatedPost: Post) {
-        _data.postValue(_data.value?.copy(
-            posts = _data.value?.posts?.map { p ->
-                if (p.id == updatedPost.id) updatedPost else p
-            } ?: emptyList()
-        ))
-    }
 }
