@@ -24,7 +24,6 @@
             tools:listitem="@layout/card_post" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-
     <!-- ProgressBar (показывается при загрузке) -->
     <ProgressBar
         android:id="@+id/progress"
@@ -36,6 +35,15 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Индикатор синхронизации -->
+    <ProgressBar
+        android:id="@+id/syncProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_margin="16dp"/>
 
     <!-- Сообщение "Нет постов" -->
     <TextView
@@ -49,39 +57,52 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Группа для отображения ошибки сети -->
-    <androidx.constraintlayout.widget.Group
+    <!-- Группа для отображения ошибки загрузки -->
+    <LinearLayout
         android:id="@+id/errorGroup"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:visibility="gone"
-        app:constraint_referenced_ids="errorTitle,retry" />
-
-
-    <!-- Заголовок ошибки -->
-    <TextView
-        android:id="@+id/errorTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/network_error"
-        app:layout_constraintBottom_toTopOf="@id/retry"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed" />
-
-
-    <!-- Кнопка "Повторить" -->
-    <Button
-        android:id="@+id/retry"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/retry"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/errorTitle" />
+        app:layout_constraintTop_toTopOf="parent">
 
+        <TextView
+            android:id="@+id/errorText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/error_loading"
+            android:textSize="18sp"
+            android:textColor="@color/design_default_color_error"
+            android:layout_gravity="center"/>
+
+        <Button
+            android:id="@+id/retryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/retry"
+            android:layout_gravity="center"
+            android:layout_marginTop="8dp"/>
+    </LinearLayout>
+
+    <!-- Сообщение об отсутствии сети (появляется над FAB) -->
+    <TextView
+        android:id="@+id/noConnectionMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/network_error"
+        android:textColor="@android:color/white"
+        android:background="@color/design_default_color_error"
+        android:padding="12dp"
+        android:gravity="center"
+        android:visibility="gone"
+        android:elevation="4dp"
+        app:layout_constraintBottom_toTopOf="@id/fab"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="8dp"/>
 
     <!-- Floating Action Button (добавление поста) -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -93,4 +114,5 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:srcCompat="@drawable/ic_add_24" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

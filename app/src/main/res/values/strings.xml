@@ -25,4 +25,8 @@
     <string name="network_error">Network error</string>
     <string name="retry">Retry</string>
     <string name="error_loading">error_loading</string>
+    <string name="sync_error">sync_error</string>
+    <string name="sync_error_with_count">sync_error_with_count: %d</string>
+    <string name="pending_posts">pending_posts</string>
+    <string name="syncing">syncing</string>
 </resources>

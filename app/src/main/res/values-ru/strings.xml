@@ -23,7 +23,11 @@
     <string name="channel_remote_name">Уведомления с сервера</string>
     <string name="channel_remote_description">Уведомления с удалённого сервера</string>
     <string name="no_posts">Нет записей</string>
-    <string name="network_error">ошибка сети</string>
+    <string name="network_error">Ошибка сети</string>
     <string name="retry">повторить</string>
     <string name="error_loading">ошибка загрузки</string>
+    <string name="sync_error">Ошибка синхронизации</string>
+    <string name="sync_error_with_count">Ошибка синхронизации. Ожидает отправки: %d</string>
+    <string name="pending_posts">Ожидает отправки: %d</string>
+    <string name="syncing">Синхронизация…</string>
 </resources>

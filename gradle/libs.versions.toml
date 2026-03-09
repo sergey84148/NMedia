@@ -34,6 +34,7 @@ swiperefreshlayout = "1.2.0"
 glide = "5.0.5"
 cronetEmbedded = "143.7445.0"
 playServicesFido = "21.2.0"
+cameraCore = "1.5.3"
 
 [libraries]
 androidx-lifecycle-livedata-ktx = { module = "androidx.lifecycle:lifecycle-livedata-ktx", version.ref = "lifecycleLivedataKtx" }
@@ -70,6 +71,7 @@ generativeai = { group = "com.google.ai.client.generativeai", name = "generative
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 cronet-embedded = { group = "org.chromium.net", name = "cronet-embedded", version.ref = "cronetEmbedded" }
 play-services-fido = { group = "com.google.android.gms", name = "play-services-fido", version.ref = "playServicesFido" }
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

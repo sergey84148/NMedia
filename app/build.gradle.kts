@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.glide)
     implementation(libs.cronet.embedded)
     implementation(libs.play.services.fido)
+    implementation(libs.androidx.camera.core)
     annotationProcessor(libs.glide.compiler)
 
     implementation(libs.converter.gson)

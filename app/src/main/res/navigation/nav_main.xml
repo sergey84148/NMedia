@@ -23,7 +23,11 @@
         android:id="@+id/newPostFragment"
         android:name="ru.netology.nmedia.fragment.NewPostFragment"
         android:label="fragment_new_post"
-        tools:layout="@layout/fragment_new_post" />
+        tools:layout="@layout/fragment_new_post" >
+        <action
+            android:id="@+id/action_newPostFragment_to_postDetailFragment"
+            app:destination="@id/postDetailFragment" />
+    </fragment>
 
     <fragment
         android:id="@+id/postDetailFragment"
@@ -34,9 +38,6 @@
             android:name="postId"
             app:argType="long"
             app:nullable="false" />
-        <action
-            android:id="@+id/action_postDetailFragment_to_newPostFragment"
-            app:destination="@id/newPostFragment" />
     </fragment>
 
 </navigation>

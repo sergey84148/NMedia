@@ -13,6 +13,7 @@ import ru.netology.nmedia.model.FeedModelState
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.repository.PostRepositoryImpl
 import ru.netology.nmedia.util.SingleLiveEvent
+import ru.netology.nmedia.utils.RetryPolicy
 
 val emptyTemplate: Post = Post(
     id = 0L,
@@ -35,28 +36,30 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     val state: LiveData<FeedModelState>
         get() = _state
 
-    // Используем dataLive из репозитория
     val data: LiveData<FeedModel> = repository.dataLive.map {
         FeedModel(it, it.isEmpty())
     }
 
-    // Текущий редактируемый пост
     val edited = MutableLiveData(emptyTemplate)
 
-    // Событие: пост успешно создан/обновлен
     private val _postCreated = SingleLiveEvent<Unit>()
     val postCreated: LiveData<Unit>
         get() = _postCreated
 
-    // Состояние синхронизации
     private val _syncState = MutableLiveData<SyncState>()
     val syncState: LiveData<SyncState>
         get() = _syncState
 
+    // Отслеживание состояния сети
+    private val _isNetworkAvailable = MutableLiveData(true)
+    val isNetworkAvailable: LiveData<Boolean> = _isNetworkAvailable
+
+    private val _showNoConnectionMessage = MutableLiveData(false)
+    val showNoConnectionMessage: LiveData<Boolean> = _showNoConnectionMessage
+
     init {
         loadPosts()
 
-        // Наблюдение за состоянием синхронизации
         viewModelScope.launch {
             repository.getSyncState().collect { syncState ->
                 _syncState.postValue(syncState)
@@ -64,16 +67,37 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Периодическая синхронизация каждые 5 минут
+        // Периодическая синхронизация
         viewModelScope.launch {
             while (true) {
                 delay(5 * 60 * 1000)
-                syncWithServer()
+                if (_syncState.value != SyncState.SYNCING) {
+                    syncWithServer()
+                }
+            }
+        }
+
+        // Отслеживание состояния сети
+        viewModelScope.launch {
+            RetryPolicy.observeNetwork(getApplication()).collect { isConnected ->
+                _isNetworkAvailable.postValue(isConnected)
+
+                if (!isConnected) {
+                    _showNoConnectionMessage.postValue(true)
+                } else {
+                    _showNoConnectionMessage.postValue(false)
+                    if (_syncState.value == SyncState.FAILED || getPendingPostsCount() > 0) {
+                        retryFailedSync()
+                    }
+                }
             }
         }
     }
 
-    // Обновление состояния UI
+    private suspend fun getPendingPostsCount(): Int {
+        return repository.getPendingPostsCount()
+    }
+
     private fun updateState() {
         viewModelScope.launch {
             val pendingCount = repository.getPendingPostsCount()
@@ -95,7 +119,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 repository.getAllAsync()
-                _state.value = _state.value?.copy(loading = false)
+                _state.value = _state.value?.copy(loading = false, error = false)
             } catch (_: Exception) {
                 _state.value = _state.value?.copy(loading = false, error = true)
                 Log.e("PostViewModel", "Load posts error:")
@@ -108,7 +132,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 repository.getAllAsync()
-                _state.value = _state.value?.copy(refreshing = false)
+                _state.value = _state.value?.copy(refreshing = false, error = false)
             } catch (_: Exception) {
                 _state.value = _state.value?.copy(refreshing = false, error = true)
                 Log.e("PostViewModel", "Refresh posts error:")
@@ -122,15 +146,16 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             if (trimmedContent.isNotBlank()) {
                 viewModelScope.launch {
                     try {
-                        val updatedPost = repository.save(post.copy(content = trimmedContent))
+                        repository.save(post.copy(content = trimmedContent))
                         _postCreated.postValue(Unit)
+                        Log.d("PostViewModel", "Post saved successfully")
 
-                        // Пытаемся синхронизировать сразу
-                        launch {
-                            syncWithServer()
-                        }
+                        // Не вызываем loadPosts() здесь, так как данные уже в БД
+                        // И не показываем ошибку, если пост сохранился локально
+
                     } catch (e: Exception) {
                         Log.e("PostViewModel", "Save post error:", e)
+                        // Показываем ошибку только если не удалось сохранить даже локально
                         _state.value = _state.value?.copy(error = true)
                     }
                 }
@@ -143,34 +168,30 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         edited.value = post
     }
 
-    fun toggleLike(post: Post) = viewModelScope.launch {
-        try {
-            if (post.likedByMe) {
-                repository.dislikeById(post.id)
-            } else {
-                repository.likeById(post.id)
+    fun likeById(id: Long) {
+        viewModelScope.launch {
+            try {
+                repository.likeById(id)
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Like error:", e)
+                _state.value = _state.value?.copy(error = true)
             }
-            // Пытаемся синхронизировать
-            launch {
-                syncWithServer()
-            }
-        } catch (e: Exception) {
-            Log.e("PostViewModel", "Toggle like error:", e)
-            _state.value = _state.value?.copy(error = true)
         }
     }
 
-    fun removeById(id: Long) = viewModelScope.launch {
-        try {
-            repository.removeById(id)
-            // Пытаемся синхронизировать
-            launch {
-                syncWithServer()
+    fun removeById(id: Long) {
+        viewModelScope.launch {
+            try {
+                repository.removeById(id)
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Remove error:", e)
+                _state.value = _state.value?.copy(error = true)
             }
-        } catch (e: Exception) {
-            Log.e("PostViewModel", "Remove post error:", e)
-            _state.value = _state.value?.copy(error = true)
         }
+    }
+
+    fun toggleLike(post: Post) {
+        likeById(post.id)
     }
 
     fun syncWithServer() {
@@ -185,6 +206,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     fun retryFailedSync() {
         viewModelScope.launch {
+            _state.value = _state.value?.copy(syncError = false)
             repository.retryFailedSync()
         }
     }

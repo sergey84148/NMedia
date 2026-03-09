@@ -39,10 +39,11 @@ class FeedFragment : Fragment() {
         val adapter = PostsAdapter(object : OnInteractionListener {
             override fun onEdit(post: Post) {
                 viewModel.edit(post)
+                findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
             }
 
             override fun onLike(post: Post) {
-                viewModel.toggleLike(post)
+                viewModel.likeById(post.id)
             }
 
             override fun onRemove(post: Post) {
@@ -66,37 +67,58 @@ class FeedFragment : Fragment() {
 
         binding.list.adapter = adapter
 
-        // Обработчик свайпа вниз для обновления
+        // Обработчик свайпа вниз для синхронизации
         binding.swipeRefreshLayout.setOnRefreshListener {
-            viewModel.loadPosts()
+            viewModel.syncWithServer()
+            binding.swipeRefreshLayout.isRefreshing = false
         }
 
         // Наблюдение за состоянием данных
-        viewModel.data.observe(viewLifecycleOwner) { state ->
-            adapter.submitList(state.posts)
-            if (state.empty) {
-                Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
-                    .show()
-            }
+        viewModel.data.observe(viewLifecycleOwner) { feedModel ->
+            adapter.submitList(feedModel.posts)
+            binding.empty.isVisible = feedModel.empty
         }
 
+        // Наблюдение за состоянием загрузки и ошибок
         viewModel.state.observe(viewLifecycleOwner) { state ->
             binding.progress.isVisible = state.loading
+            binding.syncProgress.isVisible = state.syncing
+
+            // Обработка ошибок загрузки
             if (state.error) {
-                Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
-                    .show()
+                binding.errorGroup.isVisible = true
+                binding.retryButton.setOnClickListener {
+                    viewModel.loadPosts()
+                    binding.errorGroup.isVisible = false
+                }
+            } else {
+                binding.errorGroup.isVisible = false
+            }
+
+            // Обновление текста сообщения об отсутствии сети с количеством ожидающих постов
+            if (state.pendingPostsCount > 0 && viewModel.isNetworkAvailable.value == false) {
+                binding.noConnectionMessage.text = getString(
+                    R.string.sync_error_with_count,
+                    state.pendingPostsCount
+                )
             }
         }
 
-        // Кнопка "Повторить" при ошибке
-        binding.retry.setOnClickListener {
-            viewModel.loadPosts()
+        // Наблюдение за состоянием сети
+        viewModel.showNoConnectionMessage.observe(viewLifecycleOwner) { show ->
+            binding.noConnectionMessage.isVisible = show
         }
 
         // Кнопка FAB для создания нового поста
         binding.fab.setOnClickListener {
             findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // При возвращении на экран тоже синхронизируемся
+        viewModel.syncWithServer()
     }
 
     override fun onDestroyView() {
