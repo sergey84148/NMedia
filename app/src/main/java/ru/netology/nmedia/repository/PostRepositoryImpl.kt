@@ -5,12 +5,14 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import ru.netology.nmedia.utils.RetryPolicy
 import ru.netology.nmedia.api.PostsApi
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.entity.PostEntity
 import ru.netology.nmedia.enumeration.SyncState
-import ru.netology.nmedia.utils.RetryPolicy
+import java.io.IOException
 
 class PostRepositoryImpl(
     private val dao: PostDao,
@@ -19,37 +21,39 @@ class PostRepositoryImpl(
     private val _syncState = MutableStateFlow(SyncState.SYNCED)
     override suspend fun getSyncState(): Flow<SyncState> = _syncState
 
+    // Для Flow (новый способ)
     override val data: Flow<List<Post>>
-        get() = throw UnsupportedOperationException("Use dataLive instead")
-
-    override val dataLive: LiveData<List<Post>> = dao.getAll()
-        .map { entities -> entities.map { it.toDto() } }
+        get() = dao.getAll().map { entities ->
+            entities.map { it.toDto() }
+        }
 
     override suspend fun getAllAsync() {
+        if (_syncState.value == SyncState.SYNCING) return
+
         try {
             _syncState.value = SyncState.SYNCING
             Log.d("PostRepository", "Loading posts from server")
+
             val posts = PostsApi.retrofitService.getAll()
             Log.d("PostRepository", "Loaded ${posts.size} posts from server")
 
-            // Получаем текущие PENDING посты, чтобы не затереть их
             val pendingPosts = dao.getPostsBySyncStates(
                 listOf(SyncState.PENDING, SyncState.FAILED, SyncState.PENDING_DELETE)
             )
             val pendingServerIds = pendingPosts.mapNotNull { it.serverId }.toSet()
-            Log.d("PostRepository", "Pending server IDs: $pendingServerIds")
 
-            // Фильтруем посты с сервера, исключая те, что есть в PENDING
             val postsToInsert = posts
                 .filter { !pendingServerIds.contains(it.id) }
                 .map { PostEntity.fromDto(it, SyncState.SYNCED) }
 
             if (postsToInsert.isNotEmpty()) {
                 dao.insert(postsToInsert)
-                Log.d("PostRepository", "Inserted ${postsToInsert.size} posts from server")
             }
 
             _syncState.value = SyncState.SYNCED
+        } catch (e: IOException) {
+            _syncState.value = SyncState.FAILED
+            Log.e("PostRepository", "Network error loading posts", e)
         } catch (e: Exception) {
             _syncState.value = SyncState.FAILED
             Log.e("PostRepository", "Error loading posts", e)
@@ -69,24 +73,26 @@ class PostRepositoryImpl(
 
         dao.update(updatedEntity)
 
-        try {
+        return try {
             val serverPost = if (entity.likedByMe) {
                 PostsApi.retrofitService.dislikeById(entity.serverId ?: id)
             } else {
                 PostsApi.retrofitService.likeById(entity.serverId ?: id)
             }
 
-            dao.update(
-                updatedEntity.copy(
-                    syncState = SyncState.SYNCED,
-                    retryCount = 0
-                )
+            val syncedEntity = updatedEntity.copy(
+                syncState = SyncState.SYNCED,
+                retryCount = 0,
+                likes = serverPost.likes,
+                likedByMe = serverPost.likedByMe
             )
-            return serverPost
+            dao.update(syncedEntity)
+
+            serverPost
         } catch (e: Exception) {
             Log.e("PostRepository", "Like/Dislike API error", e)
             _syncState.value = SyncState.FAILED
-            return updatedEntity.toDto()
+            updatedEntity.toDto()
         }
     }
 
@@ -98,13 +104,12 @@ class PostRepositoryImpl(
 
         Log.d("PostRepository", "Removing post: localId=${entity.id}, serverId=${entity.serverId}")
 
-        val originalEntity = entity.copy()
-
         if (entity.serverId == null) {
             dao.delete(entity)
             return
         }
 
+        // Сначала удаляем локально
         dao.delete(entity)
 
         try {
@@ -112,11 +117,12 @@ class PostRepositoryImpl(
             Log.d("PostRepository", "Successfully deleted from server")
         } catch (e: Exception) {
             Log.e("PostRepository", "Delete API error", e)
+            // Восстанавливаем с пометкой на удаление
             dao.insert(
-                originalEntity.copy(
+                entity.copy(
                     syncState = SyncState.PENDING_DELETE,
                     lastModified = System.currentTimeMillis(),
-                    retryCount = originalEntity.retryCount + 1
+                    retryCount = entity.retryCount + 1
                 )
             )
             _syncState.value = SyncState.FAILED
@@ -125,51 +131,88 @@ class PostRepositoryImpl(
 
     override suspend fun save(post: Post): Post {
         Log.d("PostRepository", "=== SAVE OPERATION START ===")
-        Log.d("PostRepository", "Post to save: $post")
-        Log.d("PostRepository", "Post ID: ${post.id}, isNew: ${post.id == 0L}")
+        Log.d("PostRepository", "1. Received post: $post")
+        Log.d("PostRepository", "2. post.id = ${post.id}, type = ${post.id::class.simpleName}")
+        Log.d("PostRepository", "3. isNew = ${post.id == 0L}")
 
         // 1. СНАЧАЛА сохраняем локально
         val entity = PostEntity.fromDto(post, SyncState.PENDING)
+        Log.d("PostRepository", "4. Created entity: serverId=${entity.serverId}")
 
-        val newId: Long = (if (post.id == 0L) {
-            Log.d("PostRepository", "Inserting new post locally")
-            val id = dao.insert(entity.copy(serverId = null))
-            Log.d("PostRepository", "New local ID: $id")
-            id
+        val newId: Long = if (post.id == 0L) {
+            Log.d("PostRepository", "5a. Inserting new post locally")
+            dao.insert(entity.copy(serverId = null))
+
+            val lastPost = dao.findLastEditedPost()
+                ?: throw IllegalStateException("Failed to get inserted post ID")
+            Log.d("PostRepository", "6a. New local ID: ${lastPost.id}")
+            lastPost.id
         } else {
-            Log.d("PostRepository", "Updating existing post locally")
+            Log.d("PostRepository", "5b. Updating existing post locally")
             dao.update(entity)
-            Log.d("PostRepository", "Updated post with ID: ${post.id}")
             post.id
-        }) as Long
+        }
 
-        // Для нового поста отправляем id = 0, для существующего - реальный id
-        val postForServer = post.copy(id = post.id)
-
-        Log.d("PostRepository", "Sending to server: $postForServer")
+        Log.d("PostRepository", "7. newId = $newId")
 
         // 2. ЗАТЕМ отправляем на сервер
         return try {
-            Log.d("PostRepository", "Sending to server: $postForServer")
+            Log.d("PostRepository", "8. Preparing to send to server")
+
+            // ВАЖНО: Создаем копию с явным указанием id
+            val postForServer = if (post.id == 0L) {
+                Post(
+                    id = 0L,
+                    author = post.author,
+                    authorAvatar = post.authorAvatar,
+                    content = post.content,
+                    published = post.published,
+                    likedByMe = post.likedByMe,
+                    likes = post.likes,
+                    shares = post.shares,
+                    video = post.video,
+                    attachment = post.attachment
+                ).also {
+                    Log.d("PostRepository", "9a. Created new post for server: $it")
+                    Log.d("PostRepository", "10a. New post id = ${it.id}, type = ${it.id::class.simpleName}")
+                }
+            } else {
+                post.also {
+                    Log.d("PostRepository", "9b. Using existing post for server: $it")
+                    Log.d("PostRepository", "10b. Existing post id = ${it.id}, type = ${it.id::class.simpleName}")
+                }
+            }
+
+            Log.d("PostRepository", "11. Calling API with post id: ${postForServer.id}")
+
             val serverPost = PostsApi.retrofitService.save(postForServer)
-            Log.d("PostRepository", "Server response SUCCESS: $serverPost")
-            Log.d("PostRepository", "Server post ID: ${serverPost.id}")
+            Log.d("PostRepository", "12. Server response: $serverPost")
+            Log.d("PostRepository", "13. Server post id: ${serverPost.id}")
 
-            // Создаем синхронизированную сущность
             val syncedEntity = PostEntity.fromDto(serverPost, SyncState.SYNCED)
+            Log.d("PostRepository", "14. Created synced entity with serverId=${syncedEntity.serverId}")
 
-            // Для существующего поста: обновляем существующую запись
-            Log.d("PostRepository", "Processing UPDATE - updating existing post")
-            dao.update(syncedEntity)
-            Log.d("PostRepository", "Updated post with serverId: ${syncedEntity.serverId}")
+            if (post.id == 0L) {
+                Log.d("PostRepository", "15a. Deleting temporary post with local ID: $newId")
+                val entityToDelete = dao.getById(newId) ?: entity
+                dao.delete(entityToDelete)
+                dao.insert(syncedEntity)
+                Log.d("PostRepository", "16a. Inserted synced post")
+            } else {
+                Log.d("PostRepository", "15b. Updating existing post")
+                dao.update(syncedEntity)
+                Log.d("PostRepository", "16b. Updated post")
+            }
 
             Log.d("PostRepository", "=== SAVE OPERATION SUCCESS ===")
             serverPost
         } catch (e: Exception) {
             Log.e("PostRepository", "=== SAVE OPERATION FAILED ===")
-            Log.e("PostRepository", "Save API error", e)
+            Log.e("PostRepository", "Error type: ${e::class.simpleName}")
+            Log.e("PostRepository", "Error message: ${e.message}")
+            e.printStackTrace()
             _syncState.value = SyncState.FAILED
-            post.copy(id = newId) // Возвращаем пост с локальным ID
+            post.copy(id = newId)
         }
     }
 
@@ -185,19 +228,21 @@ class PostRepositoryImpl(
 
         dao.update(updatedEntity)
 
-        try {
+        return try {
             val serverPost = PostsApi.retrofitService.shareById(entity.serverId ?: id)
-            dao.update(
-                updatedEntity.copy(
-                    syncState = SyncState.SYNCED,
-                    retryCount = 0
-                )
+
+            val syncedEntity = updatedEntity.copy(
+                syncState = SyncState.SYNCED,
+                retryCount = 0,
+                shares = serverPost.shares
             )
-            return serverPost
+            dao.update(syncedEntity)
+
+            serverPost
         } catch (e: Exception) {
             Log.e("PostRepository", "Share API error", e)
             _syncState.value = SyncState.FAILED
-            return updatedEntity.toDto()
+            updatedEntity.toDto()
         }
     }
 
@@ -237,7 +282,22 @@ class PostRepositoryImpl(
                     }
                     local.serverId == null -> {
                         Log.d("PostRepository", "Processing NEW post: ${local.id}")
-                        val created = PostsApi.retrofitService.save(local.toDto())
+                        // Для нового поста отправляем id = 0
+                        val dto = local.toDto()
+                        val postForServer = Post(
+                            id = 0L,  // Явно указываем 0L
+                            author = dto.author,
+                            authorAvatar = dto.authorAvatar,
+                            content = dto.content,
+                            published = dto.published,
+                            likedByMe = dto.likedByMe,
+                            likes = dto.likes,
+                            shares = dto.shares,
+                            video = dto.video
+                        )
+                        Log.d("PostRepository", "Post for server: $postForServer")
+
+                        val created = PostsApi.retrofitService.save(postForServer)
                         Log.d("PostRepository", "Created post with serverId: ${created.id}")
 
                         dao.delete(local)
@@ -246,19 +306,7 @@ class PostRepositoryImpl(
                     }
                     else -> {
                         Log.d("PostRepository", "Processing UPDATE for post: ${local.id}")
-
-                        if (local.likedByMe != local.toDto().likedByMe) {
-                            if (local.likedByMe) {
-                                PostsApi.retrofitService.likeById(local.serverId)
-                            } else {
-                                PostsApi.retrofitService.dislikeById(local.serverId)
-                            }
-                        }
-                        if (local.shares != local.toDto().shares) {
-                            PostsApi.retrofitService.shareById(local.serverId)
-                        }
-
-                        val updated = PostsApi.retrofitService.update(local.serverId, local.toDto())
+                        val updated = PostsApi.retrofitService.save(local.toDto())
                         dao.update(PostEntity.fromDto(updated, SyncState.SYNCED))
                         Log.d("PostRepository", "UPDATE sync completed for post: ${local.id}")
                     }
@@ -271,35 +319,43 @@ class PostRepositoryImpl(
     }
 
     private suspend fun fetchServerChanges() {
-        val lastSync = dao.getLastSyncTime() ?: 0L
-        Log.d("PostRepository", "Fetching changes since: $lastSync")
+        try {
+            val serverPosts = PostsApi.retrofitService.getAll()
 
-        val changes = PostsApi.retrofitService.getChanges(lastSync)
-        Log.d("PostRepository", "Received ${changes.posts.size} changed posts, ${changes.deletedIds.size} deleted IDs")
+            val localPosts = dao.getPostsBySyncStates(
+                listOf(SyncState.SYNCED, SyncState.PENDING, SyncState.FAILED)
+            )
+            val localPostsMap = localPosts.mapNotNull { it.serverId?.let { id -> id to it } }.toMap()
 
-        changes.posts.forEach { serverPost ->
-            val local = dao.getPostByServerId(serverPost.id)
-            when {
-                local == null -> {
-                    Log.d("PostRepository", "New post from server: ${serverPost.id}")
-                    dao.insert(PostEntity.fromDto(serverPost, SyncState.SYNCED))
-                }
-                serverPost.id > local.lastModified && local.syncState == SyncState.SYNCED -> {
-                    Log.d("PostRepository", "Updating post from server: ${serverPost.id}")
-                    dao.update(PostEntity.fromDto(serverPost, SyncState.SYNCED))
+            serverPosts.forEach { serverPost ->
+                val localPost = localPostsMap[serverPost.id]
+                when {
+                    localPost == null -> {
+                        dao.insert(PostEntity.fromDto(serverPost, SyncState.SYNCED))
+                    }
+                    localPost.syncState == SyncState.SYNCED -> {
+                        dao.update(PostEntity.fromDto(serverPost, SyncState.SYNCED))
+                    }
                 }
             }
-        }
 
-        changes.deletedIds.forEach { serverId ->
-            Log.d("PostRepository", "Deleting post with serverId: $serverId")
-            dao.deleteByServerId(serverId)
+            val serverPostIds = serverPosts.map { it.id }.toSet()
+            localPostsMap.keys.forEach { serverId ->
+                if (!serverPostIds.contains(serverId)) {
+                    val localPost = localPostsMap[serverId]
+                    if (localPost != null && localPost.syncState != SyncState.PENDING_DELETE) {
+                        dao.deleteByServerId(serverId)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PostRepository", "Error fetching server changes", e)
+            throw e
         }
     }
 
     private suspend fun handleSyncError(entity: PostEntity) {
         val newRetryCount = entity.retryCount + 1
-        Log.d("PostRepository", "Handling sync error for post ${entity.id}, retry count: $newRetryCount")
 
         if (RetryPolicy.canRetry(newRetryCount)) {
             dao.update(entity.copy(retryCount = newRetryCount))
@@ -326,6 +382,16 @@ class PostRepositoryImpl(
             dao.update(it.copy(syncState = SyncState.PENDING, retryCount = 0))
         }
         syncWithServer()
+    }
+
+    // 👇 НОВЫЙ МЕТОД для подсчета новых постов (для плашки "Свежие записи")
+    override suspend fun getNewerPostsCount(timestamp: Long): Int {
+        return try {
+            dao.getNewerPostsCount(timestamp)
+        } catch (e: Exception) {
+            Log.e("PostRepository", "Error getting newer posts count", e)
+            0
+        }
     }
 
     private suspend fun findPostById(id: Long): PostEntity? {

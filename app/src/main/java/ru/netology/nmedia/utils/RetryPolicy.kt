@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 object RetryPolicy {
-    // ========== RETRY POLICY ==========
 
     const val MAX_RETRIES = 3
     const val INITIAL_BACKOFF_MS = 1000L // 1 секунда

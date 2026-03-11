@@ -5,11 +5,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.OvershootInterpolator
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
-import com.google.android.material.snackbar.Snackbar
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import ru.netology.nmedia.R
 import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.PostsAdapter
@@ -21,6 +23,7 @@ class FeedFragment : Fragment() {
 
     private val viewModel: PostViewModel by activityViewModels()
     private var binding: FragmentFeedBinding? = null
+    private var isBannerVisible = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -34,6 +37,9 @@ class FeedFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val binding = this.binding!!
+
+        // Настройка плашки "Свежие записи"
+        setupNewPostsBanner(binding)
 
         // Адаптер для RecyclerView
         val adapter = PostsAdapter(object : OnInteractionListener {
@@ -61,11 +67,16 @@ class FeedFragment : Fragment() {
             }
 
             override fun onOpenPost(post: Post) {
-                // Логика открытия поста (если нужна)
+                // Используем Bundle вместо Safe Args для избежания ошибки
+                val bundle = Bundle().apply {
+                    putLong("postId", post.id)
+                }
+                findNavController().navigate(R.id.action_feedFragment_to_postDetailFragment, bundle)
             }
         })
 
         binding.list.adapter = adapter
+        setupRecyclerViewScrollListener(binding)
 
         // Обработчик свайпа вниз для синхронизации
         binding.swipeRefreshLayout.setOnRefreshListener {
@@ -76,7 +87,7 @@ class FeedFragment : Fragment() {
         // Наблюдение за состоянием данных
         viewModel.data.observe(viewLifecycleOwner) { feedModel ->
             adapter.submitList(feedModel.posts)
-            binding.empty.isVisible = feedModel.empty
+            binding.empty.isVisible = feedModel.posts.isEmpty()
         }
 
         // Наблюдение за состоянием загрузки и ошибок
@@ -106,7 +117,20 @@ class FeedFragment : Fragment() {
 
         // Наблюдение за состоянием сети
         viewModel.showNoConnectionMessage.observe(viewLifecycleOwner) { show ->
-            binding.noConnectionMessage.isVisible = show
+            binding.noConnectionMessage.isVisible = show == true
+        }
+
+        // Наблюдение за плашкой новых постов
+        viewModel.showNewPostsBanner.observe(viewLifecycleOwner) { show ->
+            if (show == true && !isBannerVisible) {
+                showNewPostsBanner(binding)
+            } else if (show == false && isBannerVisible) {
+                hideNewPostsBanner(binding)
+            }
+        }
+
+        viewModel.newPostsCount.observe(viewLifecycleOwner) { count ->
+            updateBannerText(binding, count ?: 0)
         }
 
         // Кнопка FAB для создания нового поста
@@ -115,10 +139,90 @@ class FeedFragment : Fragment() {
         }
     }
 
+    private fun setupNewPostsBanner(binding: FragmentFeedBinding) {
+        // Устанавливаем обработчик нажатия на плашку
+        binding.newPostsBanner.setOnClickListener {
+            viewModel.onNewPostsBannerClicked()
+            smoothScrollToTop(binding)
+        }
+    }
+
+    private fun setupRecyclerViewScrollListener(binding: FragmentFeedBinding) {
+        binding.list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+
+                val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
+
+                // Если мы наверху списка, автоматически скрываем баннер
+                if (firstVisibleItemPosition == 0 && isBannerVisible) {
+                    val firstItemView = layoutManager.findViewByPosition(0)
+                    if (firstItemView != null && firstItemView.top >= 0) {
+                        viewModel.onNewPostsBannerClicked()
+                    }
+                }
+            }
+        })
+    }
+
+    private fun showNewPostsBanner(binding: FragmentFeedBinding) {
+        isBannerVisible = true
+        binding.newPostsBanner.visibility = View.VISIBLE
+        binding.newPostsBanner.alpha = 0f
+        binding.newPostsBanner.translationY = -50f
+
+        binding.newPostsBanner.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(300)
+            .setInterpolator(OvershootInterpolator())
+            .start()
+    }
+
+    private fun hideNewPostsBanner(binding: FragmentFeedBinding) {
+        isBannerVisible = false
+        binding.newPostsBanner.animate()
+            .alpha(0f)
+            .translationY(-50f)
+            .setDuration(200)
+            .withEndAction {
+                binding.newPostsBanner.visibility = View.GONE
+            }
+            .start()
+    }
+
+    private fun smoothScrollToTop(binding: FragmentFeedBinding) {
+        binding.list.smoothScrollToPosition(0)
+
+        // Альтернатива с более плавной анимацией
+        binding.list.post {
+            binding.list.smoothScrollToPosition(0)
+        }
+    }
+
+    private fun updateBannerText(binding: FragmentFeedBinding, count: Int) {
+        binding.bannerText.text = when {
+            count > 1 -> getString(R.string.new_posts_banner)
+            count == 1 -> getString(R.string.new_post_banner)
+            else -> getString(R.string.new_posts_banner)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
-        // При возвращении на экран тоже синхронизируемся
-        viewModel.syncWithServer()
+        // При возвращении на экран проверяем новые посты
+        viewModel.checkForNewPosts()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Скрываем плашку при уходе с экрана
+        binding?.let {
+            if (isBannerVisible) {
+                hideNewPostsBanner(it)
+            }
+        }
     }
 
     override fun onDestroyView() {

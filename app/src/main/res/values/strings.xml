@@ -29,4 +29,6 @@
     <string name="sync_error_with_count">sync_error_with_count: %d</string>
     <string name="pending_posts">pending_posts</string>
     <string name="syncing">syncing</string>
+    <string name="new_posts_banner" translatable="false">Свежие записи</string>
+    <string name="new_post_banner" translatable="false">Свежая запись</string>
 </resources>

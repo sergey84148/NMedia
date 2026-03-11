@@ -7,11 +7,14 @@ data class FeedModelState(
     val error: Boolean = false,
     val refreshing: Boolean = false,
     val syncing: Boolean = false,        // НОВОЕ: идет синхронизация с сервером
-    val syncError: Boolean = false,       // НОВОЕ: ошибка синхронизации
-    val pendingPostsCount: Int = 0        // НОВОЕ: количество ожидающих синхронизации постов
+    val syncError: Boolean = false,      // НОВОЕ: ошибка синхронизации
+    val pendingPostsCount: Int = 0       // НОВОЕ: количество ожидающих синхронизации постов
 )
 
 data class FeedModel(
-    val posts: List<Post> = emptyList(),
-    val empty: Boolean = false,
-)
+    val posts: List<Post> = emptyList()
+) {
+    // Вычисляемое поле - true если список постов пуст
+    val empty: Boolean
+        get() = posts.isEmpty()
+}

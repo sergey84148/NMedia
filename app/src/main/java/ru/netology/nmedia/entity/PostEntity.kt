@@ -9,7 +9,7 @@ import ru.netology.nmedia.enumeration.SyncState
 data class PostEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val serverId: Long? = null,  // НОВОЕ: ID на сервере
+    val serverId: Long? = null,  // ID на сервере (null для новых постов)
     val author: String = "",
     val authorAvatar: String? = null,
     val content: String = "",
@@ -17,28 +17,27 @@ data class PostEntity(
     var likes: Int = 0,
     var shares: Int = 0,
     val video: String? = null,
-    val link: String = "",
     var likedByMe: Boolean = false,
-    val syncState: SyncState = SyncState.SYNCED,  // НОВОЕ: состояние синхронизации
-    val lastModified: Long = System.currentTimeMillis(),  // НОВОЕ: время последнего изменения
-    val retryCount: Int = 0  // НОВОЕ: счетчик попыток
+    val syncState: SyncState = SyncState.SYNCED,  // состояние синхронизации
+    val lastModified: Long = System.currentTimeMillis(),  // время последнего изменения
+    val retryCount: Int = 0  // счетчик попыток
 ) {
-    fun toDto() = Post(
-        id = serverId ?: id,  // ИЗМЕНЕНО: используем serverId если есть
+    fun toDto(): Post = Post(
+        id = serverId ?: 0L,  // для UI всегда используем 0 для новых постов
         author = author,
         authorAvatar = authorAvatar,
         content = content,
         published = published,
         likedByMe = likedByMe,
-        shares = shares,
-        video = video,
         likes = likes,
+        shares = shares,
+        video = video
     )
 
     companion object {
         fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED): PostEntity = PostEntity(
-            id = if (dto.id == 0L) 0 else dto.id,
-            serverId = if (dto.id != 0L) dto.id else null,  // НОВОЕ: сохраняем serverId
+            id = 0,  // всегда 0, auto-generate сгенерирует правильный ID
+            serverId = dto.id.takeIf { it != 0L },  // сохраняем serverId только если не 0
             author = dto.author,
             authorAvatar = dto.authorAvatar,
             content = dto.content,
@@ -47,8 +46,8 @@ data class PostEntity(
             shares = dto.shares,
             video = dto.video,
             likedByMe = dto.likedByMe,
-            syncState = syncState,  // НОВОЕ
-            lastModified = System.currentTimeMillis()  // НОВОЕ
+            syncState = syncState,
+            lastModified = System.currentTimeMillis()
         )
     }
 }

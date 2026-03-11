@@ -1,20 +1,21 @@
 package ru.netology.nmedia.dao
 
-import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy.Companion.REPLACE
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 import ru.netology.nmedia.entity.PostEntity
 import ru.netology.nmedia.enumeration.SyncState
 
 @Dao
 interface PostDao {
 
+    // Исправлено: имя таблицы должно быть таким же как в Entity (по умолчанию - имя класса)
     @Query("SELECT * FROM PostEntity ORDER BY id DESC")
-    fun getAll(): LiveData<List<PostEntity>>
+    fun getAll(): Flow<List<PostEntity>>
 
     @Insert(onConflict = REPLACE)
     suspend fun insert(post: PostEntity)
@@ -54,9 +55,14 @@ interface PostDao {
 
     // ========== МЕТОДЫ ДЛЯ ПОИСКА ==========
 
-    // 👇 НОВЫЙ МЕТОД - поиск по локальному ID
     @Query("SELECT * FROM PostEntity WHERE id = :id")
     suspend fun getById(id: Long): PostEntity?
+
+    // ========== МЕТОДЫ ДЛЯ ПЛАШКИ "СВЕЖИЕ ЗАПИСИ" ==========
+
+    // 👇 НОВЫЙ МЕТОД - подсчет постов, созданных после указанного времени
+    @Query("SELECT COUNT(*) FROM PostEntity WHERE lastModified > :timestamp")
+    suspend fun getNewerPostsCount(timestamp: Long): Int
 
     // ========== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ ==========
 
@@ -84,7 +90,6 @@ interface PostDao {
     @Query("UPDATE PostEntity SET syncState = :newState WHERE id = :id")
     suspend fun updateSyncState(id: Long, newState: SyncState)
 
-    // Метод delete
     @Delete
     suspend fun delete(post: PostEntity)
 }

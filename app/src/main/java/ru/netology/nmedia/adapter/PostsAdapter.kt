@@ -2,7 +2,6 @@ package ru.netology.nmedia.adapter
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,7 +13,6 @@ import androidx.recyclerview.widget.RecyclerView
 import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
-import ru.netology.nmedia.utils.Utils.formatNumber
 import ru.netology.nmedia.util.ImageLoader
 import androidx.core.net.toUri
 
