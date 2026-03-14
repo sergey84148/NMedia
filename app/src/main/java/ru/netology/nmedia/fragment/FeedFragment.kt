@@ -67,7 +67,6 @@ class FeedFragment : Fragment() {
             }
 
             override fun onOpenPost(post: Post) {
-                // Используем Bundle вместо Safe Args для избежания ошибки
                 val bundle = Bundle().apply {
                     putLong("postId", post.id)
                 }
@@ -81,7 +80,12 @@ class FeedFragment : Fragment() {
         // Обработчик свайпа вниз для синхронизации
         binding.swipeRefreshLayout.setOnRefreshListener {
             viewModel.syncWithServer()
-            binding.swipeRefreshLayout.isRefreshing = false
+            // Не скрываем сразу, показываем прогресс
+            viewModel.state.observe(viewLifecycleOwner) { state ->
+                if (!state.syncing) {
+                    binding.swipeRefreshLayout.isRefreshing = false
+                }
+            }
         }
 
         // Наблюдение за состоянием данных
@@ -112,12 +116,33 @@ class FeedFragment : Fragment() {
                     R.string.sync_error_with_count,
                     state.pendingPostsCount
                 )
+                binding.noConnectionMessage.isVisible = true
+            } else if (state.pendingPostsCount == 0 && viewModel.isNetworkAvailable.value == false) {
+                binding.noConnectionMessage.text = getString(R.string.network_error)
+                binding.noConnectionMessage.isVisible = true
+            } else if (viewModel.isNetworkAvailable.value == true) {
+                binding.noConnectionMessage.isVisible = false
             }
         }
 
         // Наблюдение за состоянием сети
         viewModel.showNoConnectionMessage.observe(viewLifecycleOwner) { show ->
-            binding.noConnectionMessage.isVisible = show == true
+            if (show == true) {
+                // Проверяем, есть ли ожидающие посты для отображения правильного сообщения
+                viewModel.state.value?.let { state ->
+                    if (state.pendingPostsCount > 0) {
+                        binding.noConnectionMessage.text = getString(
+                            R.string.sync_error_with_count,
+                            state.pendingPostsCount
+                        )
+                    } else {
+                        binding.noConnectionMessage.text = getString(R.string.network_error)
+                    }
+                }
+                binding.noConnectionMessage.isVisible = true
+            } else {
+                binding.noConnectionMessage.isVisible = false
+            }
         }
 
         // Наблюдение за плашкой новых постов
@@ -136,6 +161,12 @@ class FeedFragment : Fragment() {
         // Кнопка FAB для создания нового поста
         binding.fab.setOnClickListener {
             findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
+        }
+
+        // Наблюдаем за созданием поста для обновления ID последнего видимого поста
+        viewModel.postCreated.observe(viewLifecycleOwner) {
+            // Теперь не suspend и может быть вызван напрямую
+            viewModel.updateLastVisiblePostId()
         }
     }
 
@@ -203,9 +234,9 @@ class FeedFragment : Fragment() {
 
     private fun updateBannerText(binding: FragmentFeedBinding, count: Int) {
         binding.bannerText.text = when {
-            count > 1 -> getString(R.string.new_posts_banner)
+            count > 1 -> String.format(getString(R.string.new_posts_banner), count)
             count == 1 -> getString(R.string.new_post_banner)
-            else -> getString(R.string.new_posts_banner)
+            else -> String.format(getString(R.string.new_posts_banner), 0)
         }
     }
 

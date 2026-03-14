@@ -30,4 +30,8 @@
     <string name="sync_error_with_count">Ошибка синхронизации. Ожидает отправки: %d</string>
     <string name="pending_posts">Ожидает отправки: %d</string>
     <string name="syncing">Синхронизация…</string>
+
+    <!-- НОВЫЕ РЕСУРСЫ для плашки "Свежие записи" -->
+    <string name="new_posts_banner">%d новых записей</string>
+    <string name="new_post_banner">1 новая запись</string>
 </resources>

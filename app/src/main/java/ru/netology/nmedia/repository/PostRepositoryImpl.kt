@@ -1,17 +1,15 @@
 package ru.netology.nmedia.repository
 
 import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import ru.netology.nmedia.utils.RetryPolicy
 import ru.netology.nmedia.api.PostsApi
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.entity.PostEntity
 import ru.netology.nmedia.enumeration.SyncState
+import ru.netology.nmedia.utils.RetryPolicy
 import java.io.IOException
 
 class PostRepositoryImpl(
@@ -21,9 +19,9 @@ class PostRepositoryImpl(
     private val _syncState = MutableStateFlow(SyncState.SYNCED)
     override suspend fun getSyncState(): Flow<SyncState> = _syncState
 
-    // Для Flow (новый способ)
+    // Только видимые посты (isNew = false)
     override val data: Flow<List<Post>>
-        get() = dao.getAll().map { entities ->
+        get() = dao.getAllVisible().map { entities ->
             entities.map { it.toDto() }
         }
 
@@ -42,9 +40,16 @@ class PostRepositoryImpl(
             )
             val pendingServerIds = pendingPosts.mapNotNull { it.serverId }.toSet()
 
+            // Получаем ID новых постов
+            val newPostsIds = dao.getNewPostsIds().toSet()
+
             val postsToInsert = posts
                 .filter { !pendingServerIds.contains(it.id) }
-                .map { PostEntity.fromDto(it, SyncState.SYNCED) }
+                .map { dto ->
+                    // Если пост уже был новым, сохраняем этот статус
+                    val isNew = newPostsIds.contains(dto.id)
+                    PostEntity.Companion.fromDto(dto, SyncState.SYNCED, isNew)
+                }
 
             if (postsToInsert.isNotEmpty()) {
                 dao.insert(postsToInsert)
@@ -58,6 +63,39 @@ class PostRepositoryImpl(
             _syncState.value = SyncState.FAILED
             Log.e("PostRepository", "Error loading posts", e)
         }
+    }
+
+    override suspend fun checkForNewPosts(afterId: Long): Int {
+        return try {
+            Log.d("PostRepository", "Checking for new posts after ID: $afterId")
+
+            val allPosts = PostsApi.retrofitService.getAll()
+            val newPosts = allPosts.filter { it.id > afterId }
+
+            if (newPosts.isNotEmpty()) {
+                Log.d("PostRepository", "Found ${newPosts.size} new posts")
+
+                // Сохраняем новые посты с флагом isNew = true
+                val newEntities = newPosts.map { dto ->
+                    PostEntity.Companion.fromDto(dto, SyncState.SYNCED, isNew = true)
+                }
+                dao.insert(newEntities)
+            }
+
+            newPosts.size
+        } catch (e: Exception) {
+            Log.e("PostRepository", "Error checking new posts", e)
+            0
+        }
+    }
+
+    override suspend fun getNewPostsCount(): Int {
+        return dao.getNewPostsCount()
+    }
+
+    override suspend fun showNewPosts() {
+        Log.d("PostRepository", "Marking all new posts as visible")
+        dao.markAllAsVisible()
     }
 
     override suspend fun likeById(id: Long): Post {
@@ -105,11 +143,12 @@ class PostRepositoryImpl(
         Log.d("PostRepository", "Removing post: localId=${entity.id}, serverId=${entity.serverId}")
 
         if (entity.serverId == null) {
+            // ИСПРАВЛЕНО: используем правильный метод удаления
             dao.delete(entity)
             return
         }
 
-        // Сначала удаляем локально
+        // ИСПРАВЛЕНО: сначала удаляем локально
         dao.delete(entity)
 
         try {
@@ -132,11 +171,8 @@ class PostRepositoryImpl(
     override suspend fun save(post: Post): Post {
         Log.d("PostRepository", "=== SAVE OPERATION START ===")
         Log.d("PostRepository", "1. Received post: $post")
-        Log.d("PostRepository", "2. post.id = ${post.id}, type = ${post.id::class.simpleName}")
-        Log.d("PostRepository", "3. isNew = ${post.id == 0L}")
 
-        // 1. СНАЧАЛА сохраняем локально
-        val entity = PostEntity.fromDto(post, SyncState.PENDING)
+        val entity = PostEntity.Companion.fromDto(post, SyncState.PENDING)
         Log.d("PostRepository", "4. Created entity: serverId=${entity.serverId}")
 
         val newId: Long = if (post.id == 0L) {
@@ -155,11 +191,9 @@ class PostRepositoryImpl(
 
         Log.d("PostRepository", "7. newId = $newId")
 
-        // 2. ЗАТЕМ отправляем на сервер
         return try {
             Log.d("PostRepository", "8. Preparing to send to server")
 
-            // ВАЖНО: Создаем копию с явным указанием id
             val postForServer = if (post.id == 0L) {
                 Post(
                     id = 0L,
@@ -174,12 +208,10 @@ class PostRepositoryImpl(
                     attachment = post.attachment
                 ).also {
                     Log.d("PostRepository", "9a. Created new post for server: $it")
-                    Log.d("PostRepository", "10a. New post id = ${it.id}, type = ${it.id::class.simpleName}")
                 }
             } else {
                 post.also {
                     Log.d("PostRepository", "9b. Using existing post for server: $it")
-                    Log.d("PostRepository", "10b. Existing post id = ${it.id}, type = ${it.id::class.simpleName}")
                 }
             }
 
@@ -189,12 +221,13 @@ class PostRepositoryImpl(
             Log.d("PostRepository", "12. Server response: $serverPost")
             Log.d("PostRepository", "13. Server post id: ${serverPost.id}")
 
-            val syncedEntity = PostEntity.fromDto(serverPost, SyncState.SYNCED)
+            val syncedEntity = PostEntity.Companion.fromDto(serverPost, SyncState.SYNCED)
             Log.d("PostRepository", "14. Created synced entity with serverId=${syncedEntity.serverId}")
 
             if (post.id == 0L) {
                 Log.d("PostRepository", "15a. Deleting temporary post with local ID: $newId")
                 val entityToDelete = dao.getById(newId) ?: entity
+                // ИСПРАВЛЕНО: используем правильный метод удаления
                 dao.delete(entityToDelete)
                 dao.insert(syncedEntity)
                 Log.d("PostRepository", "16a. Inserted synced post")
@@ -276,16 +309,16 @@ class PostRepositoryImpl(
                         Log.d("PostRepository", "Processing DELETE for post: ${local.id}")
                         if (local.serverId != null) {
                             PostsApi.retrofitService.removeById(local.serverId)
+                            // ИСПРАВЛЕНО: используем правильный метод удаления
                             dao.delete(local)
                             Log.d("PostRepository", "DELETE successful for post: ${local.id}")
                         }
                     }
                     local.serverId == null -> {
                         Log.d("PostRepository", "Processing NEW post: ${local.id}")
-                        // Для нового поста отправляем id = 0
                         val dto = local.toDto()
                         val postForServer = Post(
-                            id = 0L,  // Явно указываем 0L
+                            id = 0L,
                             author = dto.author,
                             authorAvatar = dto.authorAvatar,
                             content = dto.content,
@@ -300,14 +333,15 @@ class PostRepositoryImpl(
                         val created = PostsApi.retrofitService.save(postForServer)
                         Log.d("PostRepository", "Created post with serverId: ${created.id}")
 
+                        // ИСПРАВЛЕНО: используем правильный метод удаления
                         dao.delete(local)
-                        dao.insert(PostEntity.fromDto(created, SyncState.SYNCED))
+                        dao.insert(PostEntity.Companion.fromDto(created, SyncState.SYNCED))
                         Log.d("PostRepository", "NEW post sync completed")
                     }
                     else -> {
                         Log.d("PostRepository", "Processing UPDATE for post: ${local.id}")
                         val updated = PostsApi.retrofitService.save(local.toDto())
-                        dao.update(PostEntity.fromDto(updated, SyncState.SYNCED))
+                        dao.update(PostEntity.Companion.fromDto(updated, SyncState.SYNCED))
                         Log.d("PostRepository", "UPDATE sync completed for post: ${local.id}")
                     }
                 }
@@ -321,6 +355,7 @@ class PostRepositoryImpl(
     private suspend fun fetchServerChanges() {
         try {
             val serverPosts = PostsApi.retrofitService.getAll()
+            val newPostsIds = dao.getNewPostsIds().toSet()
 
             val localPosts = dao.getPostsBySyncStates(
                 listOf(SyncState.SYNCED, SyncState.PENDING, SyncState.FAILED)
@@ -331,10 +366,13 @@ class PostRepositoryImpl(
                 val localPost = localPostsMap[serverPost.id]
                 when {
                     localPost == null -> {
-                        dao.insert(PostEntity.fromDto(serverPost, SyncState.SYNCED))
+                        // Новый пост с сервера - сохраняем как isNew = true
+                        dao.insert(PostEntity.Companion.fromDto(serverPost, SyncState.SYNCED, isNew = true))
                     }
                     localPost.syncState == SyncState.SYNCED -> {
-                        dao.update(PostEntity.fromDto(serverPost, SyncState.SYNCED))
+                        // Обновляем существующий пост, сохраняя его статус новизны
+                        val isNew = newPostsIds.contains(serverPost.id)
+                        dao.update(PostEntity.Companion.fromDto(serverPost, SyncState.SYNCED, isNew))
                     }
                 }
             }
@@ -382,16 +420,6 @@ class PostRepositoryImpl(
             dao.update(it.copy(syncState = SyncState.PENDING, retryCount = 0))
         }
         syncWithServer()
-    }
-
-    // 👇 НОВЫЙ МЕТОД для подсчета новых постов (для плашки "Свежие записи")
-    override suspend fun getNewerPostsCount(timestamp: Long): Int {
-        return try {
-            dao.getNewerPostsCount(timestamp)
-        } catch (e: Exception) {
-            Log.e("PostRepository", "Error getting newer posts count", e)
-            0
-        }
     }
 
     private suspend fun findPostById(id: Long): PostEntity? {

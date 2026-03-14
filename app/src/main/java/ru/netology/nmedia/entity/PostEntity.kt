@@ -9,7 +9,7 @@ import ru.netology.nmedia.enumeration.SyncState
 data class PostEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val serverId: Long? = null,  // ID на сервере (null для новых постов)
+    val serverId: Long? = null,
     val author: String = "",
     val authorAvatar: String? = null,
     val content: String = "",
@@ -18,12 +18,13 @@ data class PostEntity(
     var shares: Int = 0,
     val video: String? = null,
     var likedByMe: Boolean = false,
-    val syncState: SyncState = SyncState.SYNCED,  // состояние синхронизации
-    val lastModified: Long = System.currentTimeMillis(),  // время последнего изменения
-    val retryCount: Int = 0  // счетчик попыток
+    val syncState: SyncState = SyncState.SYNCED,
+    val lastModified: Long = System.currentTimeMillis(),
+    val retryCount: Int = 0,
+    val isNew: Boolean = false  // Убедитесь, что это поле есть
 ) {
     fun toDto(): Post = Post(
-        id = serverId ?: 0L,  // для UI всегда используем 0 для новых постов
+        id = serverId ?: 0L,
         author = author,
         authorAvatar = authorAvatar,
         content = content,
@@ -31,13 +32,14 @@ data class PostEntity(
         likedByMe = likedByMe,
         likes = likes,
         shares = shares,
-        video = video
+        video = video,
+        attachment = null
     )
 
     companion object {
-        fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED): PostEntity = PostEntity(
-            id = 0,  // всегда 0, auto-generate сгенерирует правильный ID
-            serverId = dto.id.takeIf { it != 0L },  // сохраняем serverId только если не 0
+        fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity = PostEntity(
+            id = 0,
+            serverId = dto.id.takeIf { it != 0L },
             author = dto.author,
             authorAvatar = dto.authorAvatar,
             content = dto.content,
@@ -47,7 +49,8 @@ data class PostEntity(
             video = dto.video,
             likedByMe = dto.likedByMe,
             syncState = syncState,
-            lastModified = System.currentTimeMillis()
+            lastModified = System.currentTimeMillis(),
+            isNew = isNew
         )
     }
 }

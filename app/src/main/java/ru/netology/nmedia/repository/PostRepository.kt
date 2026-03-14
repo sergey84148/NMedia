@@ -5,7 +5,7 @@ import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
 
 interface PostRepository {
-    // Данные как Flow (для RecyclerView)
+    // Данные как Flow (только видимые посты)
     val data: Flow<List<Post>>
 
     // CRUD операции
@@ -22,7 +22,8 @@ interface PostRepository {
     suspend fun getPendingPostsCount(): Int
     suspend fun retryFailedSync()
 
-    // 👇 НОВЫЙ МЕТОД для подсчета новых постов (для плашки "Свежие записи")
-    // Возвращает количество постов, созданных/измененных после указанного времени
-    suspend fun getNewerPostsCount(timestamp: Long): Int
+    // 👇 НОВЫЕ МЕТОДЫ для работы с новыми постами
+    suspend fun checkForNewPosts(afterId: Long): Int
+    suspend fun getNewPostsCount(): Int
+    suspend fun showNewPosts()
 }

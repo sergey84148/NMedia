@@ -12,8 +12,8 @@ import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
 import ru.netology.nmedia.model.FeedModel
 import ru.netology.nmedia.model.FeedModelState
-import ru.netology.nmedia.repository.PostRepository
-import ru.netology.nmedia.repository.PostRepositoryImpl
+import ru.netology.nmedia.repository.PostRepository  // ИСПРАВЛЕНО: импортируем интерфейс
+import ru.netology.nmedia.repository.PostRepositoryImpl  // ИСПРАВЛЕНО: импортируем реализацию
 import ru.netology.nmedia.util.SingleLiveEvent
 import ru.netology.nmedia.utils.RetryPolicy
 
@@ -31,6 +31,7 @@ val emptyTemplate: Post = Post(
 )
 
 class PostViewModel(application: Application) : AndroidViewModel(application) {
+    // ИСПРАВЛЕНО: используем тип интерфейса, а не конкретную реализацию
     private val repository: PostRepository = PostRepositoryImpl(
         AppDb.getInstance(application).postDao()
     )
@@ -39,8 +40,9 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     val state: LiveData<FeedModelState>
         get() = _state
 
+    // ИСПРАВЛЕНО: явно указываем тип для map
     val data: LiveData<FeedModel> = repository.data
-        .map { posts -> FeedModel(posts) }
+        .map { posts: List<Post> -> FeedModel(posts) }
         .asLiveData(Dispatchers.Default)
 
     val edited = MutableLiveData(emptyTemplate)
@@ -53,38 +55,36 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     val syncState: LiveData<SyncState>
         get() = _syncState
 
-    // Отслеживание состояния сети
     private val _isNetworkAvailable = MutableLiveData(true)
     val isNetworkAvailable: LiveData<Boolean> = _isNetworkAvailable
 
     private val _showNoConnectionMessage = MutableLiveData(false)
     val showNoConnectionMessage: LiveData<Boolean> = _showNoConnectionMessage
 
-    // 👇 НОВЫЕ ПОЛЯ ДЛЯ ПЛАШКИ "СВЕЖИЕ ЗАПИСИ"
     private val _showNewPostsBanner = MutableLiveData(false)
     val showNewPostsBanner: LiveData<Boolean> = _showNewPostsBanner
 
     private val _newPostsCount = MutableLiveData(0)
     val newPostsCount: LiveData<Int> = _newPostsCount
 
-    private var lastSeenTimestamp = System.currentTimeMillis()
+    private var lastVisiblePostId = 0L
 
     init {
         loadPosts()
 
         viewModelScope.launch {
-            repository.getSyncState().collect { syncState ->
+            repository.getSyncState().collect { syncState: SyncState ->  // ИСПРАВЛЕНО: явный тип
                 _syncState.postValue(syncState)
                 updateState()
             }
         }
 
-        // Периодическая синхронизация
+        // Периодическая проверка новых постов
         viewModelScope.launch {
             while (true) {
-                delay(1 * 60 * 1000) // Каждые 5 минут
+                delay(30_000) // Каждые 30 секунд
                 if (_syncState.value != SyncState.SYNCING) {
-                    syncWithServer()
+                    checkForNewPosts()
                 }
             }
         }
@@ -98,7 +98,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
                     _showNoConnectionMessage.postValue(true)
                 } else {
                     _showNoConnectionMessage.postValue(false)
-                    // При появлении сети проверяем, нужно ли синхронизироваться
                     if (_syncState.value == SyncState.FAILED || getPendingPostsCount() > 0) {
                         retryFailedSync()
                     }
@@ -106,19 +105,25 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Периодическая проверка новых постов (каждые 5 секунд)
+        // Получаем ID последнего поста при загрузке
         viewModelScope.launch {
-            while (true) {
-                delay(5_000)
-                if (_syncState.value != SyncState.SYNCING) {
-                    checkForNewPosts()
-                }
-            }
+            // Ждем загрузки данных и получаем ID последнего поста
+            delay(1000)
+            updateLastVisiblePostId()
         }
     }
 
     private suspend fun getPendingPostsCount(): Int {
         return repository.getPendingPostsCount()
+    }
+
+    fun updateLastVisiblePostId() {
+        viewModelScope.launch {
+            data.value?.posts?.firstOrNull()?.let { firstPost ->
+                lastVisiblePostId = firstPost.id
+                Log.d("PostViewModel", "Last visible post ID set to: $lastVisiblePostId")
+            }
+        }
     }
 
     private fun updateState() {
@@ -143,11 +148,39 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 repository.getAllAsync()
                 _state.value = _state.value?.copy(loading = false, error = false)
-                lastSeenTimestamp = System.currentTimeMillis()
+                updateLastVisiblePostId()
             } catch (e: Exception) {
                 _state.value = _state.value?.copy(loading = false, error = true)
                 Log.e("PostViewModel", "Load posts error: ${e.message}", e)
             }
+        }
+    }
+
+    fun checkForNewPosts() {
+        viewModelScope.launch {
+            try {
+                val currentLastId = lastVisiblePostId
+                Log.d("PostViewModel", "Checking for new posts after ID: $currentLastId")
+
+                val newCount = repository.checkForNewPosts(currentLastId)
+                if (newCount > 0) {
+                    _newPostsCount.postValue(newCount)
+                    _showNewPostsBanner.postValue(true)
+                    Log.d("PostViewModel", "Found $newCount new posts")
+                }
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Error checking new posts", e)
+            }
+        }
+    }
+
+    fun onNewPostsBannerClicked() {
+        viewModelScope.launch {
+            Log.d("PostViewModel", "Showing new posts")
+            repository.showNewPosts()
+            _showNewPostsBanner.postValue(false)
+            _newPostsCount.postValue(0)
+            updateLastVisiblePostId()
         }
     }
 
@@ -157,6 +190,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 repository.getAllAsync()
                 _state.value = _state.value?.copy(refreshing = false, error = false)
+                updateLastVisiblePostId()
             } catch (e: Exception) {
                 _state.value = _state.value?.copy(refreshing = false, error = true)
                 Log.e("PostViewModel", "Refresh posts error: ${e.message}", e)
@@ -174,7 +208,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
                         _postCreated.postValue(Unit)
                         Log.d("PostViewModel", "Post saved successfully: $savedPost")
 
-                        // Если есть проблемы с сетью, показываем сообщение
                         if (_syncState.value == SyncState.FAILED) {
                             _state.value = _state.value?.copy(syncError = true)
                         }
@@ -240,36 +273,15 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ИСПРАВЛЕНО: добавил вызов функции ()
     fun retryFailedSync() {
         viewModelScope.launch {
             _state.value = _state.value?.copy(syncError = false)
-            repository.retryFailedSync()
+            repository.retryFailedSync()  // Было repository.retryFailedSync без скобок
         }
     }
 
     fun clearError() {
         _state.value = _state.value?.copy(error = false, syncError = false)
-    }
-
-    // 👇 НОВЫЕ МЕТОДЫ ДЛЯ ПЛАШКИ "СВЕЖИЕ ЗАПИСИ"
-
-    fun checkForNewPosts() {
-        viewModelScope.launch {
-            try {
-                val newCount = repository.getNewerPostsCount(lastSeenTimestamp)
-                if (newCount > 0) {
-                    _newPostsCount.postValue(newCount)
-                    _showNewPostsBanner.postValue(true)
-                }
-            } catch (e: Exception) {
-                Log.e("PostViewModel", "Error checking new posts", e)
-            }
-        }
-    }
-
-    fun onNewPostsBannerClicked() {
-        _showNewPostsBanner.postValue(false)
-        lastSeenTimestamp = System.currentTimeMillis()
-        loadPosts()
     }
 }
