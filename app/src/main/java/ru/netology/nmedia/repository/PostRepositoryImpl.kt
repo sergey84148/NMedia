@@ -1,16 +1,15 @@
 package ru.netology.nmedia.repository
 
 import android.util.Log
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
+import ru.netology.nmedia.utils.RetryPolicy
 import ru.netology.nmedia.api.PostsApi
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.entity.PostEntity
 import ru.netology.nmedia.enumeration.SyncState
-import ru.netology.nmedia.utils.RetryPolicy
 import java.io.IOException
+import kotlin.time.Duration.Companion.seconds
 
 class PostRepositoryImpl(
     private val dao: PostDao,
@@ -24,6 +23,15 @@ class PostRepositoryImpl(
         get() = dao.getAllVisible().map { entities ->
             entities.map { it.toDto() }
         }
+
+    // Flow для отслеживания количества новых постов
+    private val _newPostsCount = MutableStateFlow(0)
+    override val newPostsCount: Flow<Int> = _newPostsCount
+        .onStart {
+            // При старте подписки получаем текущее значение из БД
+            emit(dao.getNewPostsCount())
+        }
+        .distinctUntilChanged()
 
     override suspend fun getAllAsync() {
         if (_syncState.value == SyncState.SYNCING) return
@@ -48,7 +56,7 @@ class PostRepositoryImpl(
                 .map { dto ->
                     // Если пост уже был новым, сохраняем этот статус
                     val isNew = newPostsIds.contains(dto.id)
-                    PostEntity.Companion.fromDto(dto, SyncState.SYNCED, isNew)
+                    PostEntity.fromDto(dto, SyncState.SYNCED, isNew)
                 }
 
             if (postsToInsert.isNotEmpty()) {
@@ -67,22 +75,40 @@ class PostRepositoryImpl(
 
     override suspend fun checkForNewPosts(afterId: Long): Int {
         return try {
-            Log.d("PostRepository", "Checking for new posts after ID: $afterId")
+            Log.d("PostRepository", "Checking for new posts after ID: $afterId using /newer endpoint")
 
-            val allPosts = PostsApi.retrofitService.getAll()
-            val newPosts = allPosts.filter { it.id > afterId }
-
-            if (newPosts.isNotEmpty()) {
-                Log.d("PostRepository", "Found ${newPosts.size} new posts")
-
-                // Сохраняем новые посты с флагом isNew = true
-                val newEntities = newPosts.map { dto ->
-                    PostEntity.Companion.fromDto(dto, SyncState.SYNCED, isNew = true)
-                }
-                dao.insert(newEntities)
+            if (afterId == 0L) {
+                // Если ID = 0, значит постов ещё нет - возвращаем 0
+                Log.d("PostRepository", "afterId is 0, skipping check")
+                return 0
             }
 
-            newPosts.size
+            val response = PostsApi.retrofitService.getNewer(afterId)
+
+            if (response.isSuccessful) {
+                val newPosts = response.body()
+                if (!newPosts.isNullOrEmpty()) {
+                    Log.d("PostRepository", "Found ${newPosts.size} new posts from server")
+
+                    // Сохраняем новые посты с флагом isNew = true
+                    val newEntities = newPosts.map { dto ->
+                        PostEntity.fromDto(dto, SyncState.SYNCED, isNew = true)
+                    }
+                    dao.insert(newEntities)
+
+                    // Обновляем Flow
+                    val newCount = dao.getNewPostsCount()
+                    _newPostsCount.value = newCount
+
+                    newPosts.size
+                } else {
+                    Log.d("PostRepository", "No new posts found")
+                    0
+                }
+            } else {
+                Log.e("PostRepository", "Error response: ${response.code()} ${response.message()}")
+                0
+            }
         } catch (e: Exception) {
             Log.e("PostRepository", "Error checking new posts", e)
             0
@@ -96,6 +122,8 @@ class PostRepositoryImpl(
     override suspend fun showNewPosts() {
         Log.d("PostRepository", "Marking all new posts as visible")
         dao.markAllAsVisible()
+        // Обновляем Flow - новых постов больше нет
+        _newPostsCount.value = 0
     }
 
     override suspend fun likeById(id: Long): Post {
@@ -143,12 +171,10 @@ class PostRepositoryImpl(
         Log.d("PostRepository", "Removing post: localId=${entity.id}, serverId=${entity.serverId}")
 
         if (entity.serverId == null) {
-            // ИСПРАВЛЕНО: используем правильный метод удаления
             dao.delete(entity)
             return
         }
 
-        // ИСПРАВЛЕНО: сначала удаляем локально
         dao.delete(entity)
 
         try {
@@ -156,7 +182,6 @@ class PostRepositoryImpl(
             Log.d("PostRepository", "Successfully deleted from server")
         } catch (e: Exception) {
             Log.e("PostRepository", "Delete API error", e)
-            // Восстанавливаем с пометкой на удаление
             dao.insert(
                 entity.copy(
                     syncState = SyncState.PENDING_DELETE,
@@ -172,7 +197,7 @@ class PostRepositoryImpl(
         Log.d("PostRepository", "=== SAVE OPERATION START ===")
         Log.d("PostRepository", "1. Received post: $post")
 
-        val entity = PostEntity.Companion.fromDto(post, SyncState.PENDING)
+        val entity = PostEntity.fromDto(post, SyncState.PENDING)
         Log.d("PostRepository", "4. Created entity: serverId=${entity.serverId}")
 
         val newId: Long = if (post.id == 0L) {
@@ -194,40 +219,52 @@ class PostRepositoryImpl(
         return try {
             Log.d("PostRepository", "8. Preparing to send to server")
 
+            // 👇 ИСПРАВЛЕНО: создаем пост только с полями, которые есть на сервере
             val postForServer = if (post.id == 0L) {
                 Post(
                     id = 0L,
+                    author = if (post.author.isBlank()) "Пользователь" else post.author,
+                    authorAvatar = post.authorAvatar,
+                    content = post.content,
+                    published = post.published,  // Уже Long
+                    likedByMe = post.likedByMe,
+                    likes = post.likes,
+                    attachment = post.attachment
+                    // ❌ НЕ включаем shares и video - их нет на сервере
+                )
+            } else {
+                Post(
+                    id = post.id,
                     author = post.author,
                     authorAvatar = post.authorAvatar,
                     content = post.content,
                     published = post.published,
                     likedByMe = post.likedByMe,
                     likes = post.likes,
-                    shares = post.shares,
-                    video = post.video,
                     attachment = post.attachment
-                ).also {
-                    Log.d("PostRepository", "9a. Created new post for server: $it")
-                }
-            } else {
-                post.also {
-                    Log.d("PostRepository", "9b. Using existing post for server: $it")
-                }
+                    // ❌ НЕ включаем shares и video
+                )
             }
 
-            Log.d("PostRepository", "11. Calling API with post id: ${postForServer.id}")
+            Log.d("PostRepository", "11. Calling API with post: $postForServer")
 
             val serverPost = PostsApi.retrofitService.save(postForServer)
             Log.d("PostRepository", "12. Server response: $serverPost")
             Log.d("PostRepository", "13. Server post id: ${serverPost.id}")
 
-            val syncedEntity = PostEntity.Companion.fromDto(serverPost, SyncState.SYNCED)
+            // 👇 ВАЖНО: сохраняем ответ сервера, но добавляем локальные поля shares и video
+            val syncedEntity = PostEntity.fromDto(
+                dto = serverPost.copy(
+                    shares = post.shares,  // Сохраняем локальные значения
+                    video = post.video
+                ),
+                syncState = SyncState.SYNCED
+            )
             Log.d("PostRepository", "14. Created synced entity with serverId=${syncedEntity.serverId}")
 
             if (post.id == 0L) {
                 Log.d("PostRepository", "15a. Deleting temporary post with local ID: $newId")
                 val entityToDelete = dao.getById(newId) ?: entity
-                // ИСПРАВЛЕНО: используем правильный метод удаления
                 dao.delete(entityToDelete)
                 dao.insert(syncedEntity)
                 Log.d("PostRepository", "16a. Inserted synced post")
@@ -262,18 +299,19 @@ class PostRepositoryImpl(
         dao.update(updatedEntity)
 
         return try {
-            val serverPost = PostsApi.retrofitService.shareById(entity.serverId ?: id)
+            // 👇 ИСПРАВЛЕНО: на сервере нет эндпоинта shareById, используем likeById или другой подход
+            // Временно возвращаем обновленный пост без отправки на сервер
+            Log.w("PostRepository", "Share endpoint not available on server, updating locally only")
 
             val syncedEntity = updatedEntity.copy(
                 syncState = SyncState.SYNCED,
-                retryCount = 0,
-                shares = serverPost.shares
+                retryCount = 0
             )
             dao.update(syncedEntity)
 
-            serverPost
+            updatedEntity.toDto()
         } catch (e: Exception) {
-            Log.e("PostRepository", "Share API error", e)
+            Log.e("PostRepository", "Share error", e)
             _syncState.value = SyncState.FAILED
             updatedEntity.toDto()
         }
@@ -309,7 +347,6 @@ class PostRepositoryImpl(
                         Log.d("PostRepository", "Processing DELETE for post: ${local.id}")
                         if (local.serverId != null) {
                             PostsApi.retrofitService.removeById(local.serverId)
-                            // ИСПРАВЛЕНО: используем правильный метод удаления
                             dao.delete(local)
                             Log.d("PostRepository", "DELETE successful for post: ${local.id}")
                         }
@@ -317,31 +354,60 @@ class PostRepositoryImpl(
                     local.serverId == null -> {
                         Log.d("PostRepository", "Processing NEW post: ${local.id}")
                         val dto = local.toDto()
+                        // 👇 ИСПРАВЛЕНО: отправляем только нужные поля
                         val postForServer = Post(
                             id = 0L,
-                            author = dto.author,
+                            author = if (dto.author.isBlank()) "Пользователь" else dto.author,
                             authorAvatar = dto.authorAvatar,
                             content = dto.content,
                             published = dto.published,
                             likedByMe = dto.likedByMe,
                             likes = dto.likes,
-                            shares = dto.shares,
-                            video = dto.video
+                            attachment = dto.attachment
+                            // ❌ Без shares и video
                         )
                         Log.d("PostRepository", "Post for server: $postForServer")
 
                         val created = PostsApi.retrofitService.save(postForServer)
                         Log.d("PostRepository", "Created post with serverId: ${created.id}")
 
-                        // ИСПРАВЛЕНО: используем правильный метод удаления
                         dao.delete(local)
-                        dao.insert(PostEntity.Companion.fromDto(created, SyncState.SYNCED))
+                        // 👇 Сохраняем ответ сервера с локальными shares/video
+                        dao.insert(
+                            PostEntity.fromDto(
+                                dto = created.copy(
+                                    shares = dto.shares,
+                                    video = dto.video
+                                ),
+                                syncState = SyncState.SYNCED
+                            )
+                        )
                         Log.d("PostRepository", "NEW post sync completed")
                     }
                     else -> {
                         Log.d("PostRepository", "Processing UPDATE for post: ${local.id}")
-                        val updated = PostsApi.retrofitService.save(local.toDto())
-                        dao.update(PostEntity.Companion.fromDto(updated, SyncState.SYNCED))
+                        val dto = local.toDto()
+                        // 👇 Для обновления тоже отправляем только нужные поля
+                        val postForUpdate = Post(
+                            id = dto.id,
+                            author = dto.author,
+                            authorAvatar = dto.authorAvatar,
+                            content = dto.content,
+                            published = dto.published,
+                            likedByMe = dto.likedByMe,
+                            likes = dto.likes,
+                            attachment = dto.attachment
+                        )
+                        val updated = PostsApi.retrofitService.save(postForUpdate)
+                        dao.update(
+                            PostEntity.fromDto(
+                                dto = updated.copy(
+                                    shares = dto.shares,
+                                    video = dto.video
+                                ),
+                                syncState = SyncState.SYNCED
+                            )
+                        )
                         Log.d("PostRepository", "UPDATE sync completed for post: ${local.id}")
                     }
                 }
@@ -367,12 +433,30 @@ class PostRepositoryImpl(
                 when {
                     localPost == null -> {
                         // Новый пост с сервера - сохраняем как isNew = true
-                        dao.insert(PostEntity.Companion.fromDto(serverPost, SyncState.SYNCED, isNew = true))
+                        dao.insert(
+                            PostEntity.fromDto(
+                                dto = serverPost.copy(
+                                    shares = 0,
+                                    video = null
+                                ),
+                                syncState = SyncState.SYNCED,
+                                isNew = true
+                            )
+                        )
                     }
                     localPost.syncState == SyncState.SYNCED -> {
                         // Обновляем существующий пост, сохраняя его статус новизны
                         val isNew = newPostsIds.contains(serverPost.id)
-                        dao.update(PostEntity.Companion.fromDto(serverPost, SyncState.SYNCED, isNew))
+                        dao.update(
+                            PostEntity.fromDto(
+                                dto = serverPost.copy(
+                                    shares = localPost.shares,
+                                    video = localPost.video
+                                ),
+                                syncState = SyncState.SYNCED,
+                                isNew = isNew
+                            )
+                        )
                     }
                 }
             }

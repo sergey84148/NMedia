@@ -12,8 +12,8 @@ import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
 import ru.netology.nmedia.model.FeedModel
 import ru.netology.nmedia.model.FeedModelState
-import ru.netology.nmedia.repository.PostRepository  // ИСПРАВЛЕНО: импортируем интерфейс
-import ru.netology.nmedia.repository.PostRepositoryImpl  // ИСПРАВЛЕНО: импортируем реализацию
+import ru.netology.nmedia.repository.PostRepository
+import ru.netology.nmedia.repository.PostRepositoryImpl
 import ru.netology.nmedia.util.SingleLiveEvent
 import ru.netology.nmedia.utils.RetryPolicy
 
@@ -22,16 +22,15 @@ val emptyTemplate: Post = Post(
     author = "",
     authorAvatar = "",
     content = "",
-    published = "",
+    published = System.currentTimeMillis() / 1000,  // Текущее время в секундах
     likedByMe = false,
+    likes = 0,
     shares = 0,
     video = null,
-    likes = 0,
     attachment = null
 )
 
 class PostViewModel(application: Application) : AndroidViewModel(application) {
-    // ИСПРАВЛЕНО: используем тип интерфейса, а не конкретную реализацию
     private val repository: PostRepository = PostRepositoryImpl(
         AppDb.getInstance(application).postDao()
     )
@@ -40,9 +39,8 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     val state: LiveData<FeedModelState>
         get() = _state
 
-    // ИСПРАВЛЕНО: явно указываем тип для map
     val data: LiveData<FeedModel> = repository.data
-        .map { posts: List<Post> -> FeedModel(posts) }
+        .map { posts -> FeedModel(posts) }
         .asLiveData(Dispatchers.Default)
 
     val edited = MutableLiveData(emptyTemplate)
@@ -73,18 +71,21 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         loadPosts()
 
         viewModelScope.launch {
-            repository.getSyncState().collect { syncState: SyncState ->  // ИСПРАВЛЕНО: явный тип
+            repository.getSyncState().collect { syncState ->
                 _syncState.postValue(syncState)
                 updateState()
             }
         }
 
-        // Периодическая проверка новых постов
+        // 👇 ИСПОЛЬЗУЕМ FLOW ИЗ РЕПОЗИТОРИЯ для отслеживания новых постов
         viewModelScope.launch {
-            while (true) {
-                delay(30_000) // Каждые 30 секунд
-                if (_syncState.value != SyncState.SYNCING) {
-                    checkForNewPosts()
+            repository.newPostsCount.collect { count ->
+                if (count > 0) {
+                    _newPostsCount.postValue(count)
+                    _showNewPostsBanner.postValue(true)
+                    Log.d("PostViewModel", "New posts count from Flow: $count")
+                } else {
+                    _showNewPostsBanner.postValue(false)
                 }
             }
         }
@@ -107,7 +108,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
         // Получаем ID последнего поста при загрузке
         viewModelScope.launch {
-            // Ждем загрузки данных и получаем ID последнего поста
             delay(1000)
             updateLastVisiblePostId()
         }
@@ -156,18 +156,15 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // 👇 Теперь этот метод только инициирует проверку,
+    // но основное обновление происходит через Flow
     fun checkForNewPosts() {
         viewModelScope.launch {
             try {
                 val currentLastId = lastVisiblePostId
-                Log.d("PostViewModel", "Checking for new posts after ID: $currentLastId")
-
-                val newCount = repository.checkForNewPosts(currentLastId)
-                if (newCount > 0) {
-                    _newPostsCount.postValue(newCount)
-                    _showNewPostsBanner.postValue(true)
-                    Log.d("PostViewModel", "Found $newCount new posts")
-                }
+                Log.d("PostViewModel", "Manual check for new posts after ID: $currentLastId")
+                repository.checkForNewPosts(currentLastId)
+                // Flow автоматически обновит _newPostsCount
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error checking new posts", e)
             }
@@ -204,7 +201,12 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             if (trimmedContent.isNotBlank()) {
                 viewModelScope.launch {
                     try {
-                        val savedPost = repository.save(post.copy(content = trimmedContent))
+                        // 👇 ВАЖНО: при сохранении обновляем timestamp
+                        val postToSave = post.copy(
+                            content = trimmedContent,
+                            published = System.currentTimeMillis() / 1000  // Обновляем время публикации
+                        )
+                        val savedPost = repository.save(postToSave)
                         _postCreated.postValue(Unit)
                         Log.d("PostViewModel", "Post saved successfully: $savedPost")
 
@@ -273,11 +275,10 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ИСПРАВЛЕНО: добавил вызов функции ()
     fun retryFailedSync() {
         viewModelScope.launch {
             _state.value = _state.value?.copy(syncError = false)
-            repository.retryFailedSync()  // Было repository.retryFailedSync без скобок
+            repository.retryFailedSync()
         }
     }
 

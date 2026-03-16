@@ -11,9 +11,9 @@ data class PostEntity(
     val id: Long = 0,
     val serverId: Long? = null,
     val author: String = "",
-    val authorAvatar: String? = null,
+    val authorAvatar: String = "",  // 👈 ИЗМЕНЕНО: теперь String, не nullable
     val content: String = "",
-    val published: String = "",
+    val published: Long = 0,
     var likes: Int = 0,
     var shares: Int = 0,
     val video: String? = null,
@@ -21,12 +21,12 @@ data class PostEntity(
     val syncState: SyncState = SyncState.SYNCED,
     val lastModified: Long = System.currentTimeMillis(),
     val retryCount: Int = 0,
-    val isNew: Boolean = false  // Убедитесь, что это поле есть
+    val isNew: Boolean = false
 ) {
     fun toDto(): Post = Post(
         id = serverId ?: 0L,
         author = author,
-        authorAvatar = authorAvatar,
+        authorAvatar = authorAvatar,  // Теперь String
         content = content,
         published = published,
         likedByMe = likedByMe,
@@ -41,7 +41,7 @@ data class PostEntity(
             id = 0,
             serverId = dto.id.takeIf { it != 0L },
             author = dto.author,
-            authorAvatar = dto.authorAvatar,
+            authorAvatar = dto.authorAvatar ?: "",
             content = dto.content,
             published = dto.published,
             likes = dto.likes,

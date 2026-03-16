@@ -8,6 +8,9 @@ interface PostRepository {
     // Данные как Flow (только видимые посты)
     val data: Flow<List<Post>>
 
+    // Flow для отслеживания количества новых постов (для плашки)
+    val newPostsCount: Flow<Int>
+
     // CRUD операции
     suspend fun likeById(id: Long): Post
     suspend fun dislikeById(id: Long): Post
@@ -22,7 +25,7 @@ interface PostRepository {
     suspend fun getPendingPostsCount(): Int
     suspend fun retryFailedSync()
 
-    // 👇 НОВЫЕ МЕТОДЫ для работы с новыми постами
+    // Методы для работы с новыми постами
     suspend fun checkForNewPosts(afterId: Long): Int
     suspend fun getNewPostsCount(): Int
     suspend fun showNewPosts()
