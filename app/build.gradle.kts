@@ -1,4 +1,4 @@
-import org.gradle.kotlin.dsl.implementation
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -31,9 +31,11 @@ android {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             manifestPlaceholders["usesCleartextTraffic"] = false
+            buildConfigField("String", "BASE_URL", "\"https://netomedia.ru\"")
         }
         debug {
             manifestPlaceholders["usesCleartextTraffic"] = true
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:9999\"")
         }
     }
     compileOptions {
@@ -41,27 +43,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin {
-        jvmToolchain(17)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
 dependencies {
-    implementation(libs.glide)
-    implementation(libs.cronet.embedded)
-    implementation(libs.play.services.fido)
-    implementation(libs.androidx.camera.core)
-    annotationProcessor(libs.glide.compiler)
-
-    implementation(libs.converter.gson)
-    implementation(libs.logging.interceptor)
-    implementation(libs.kotlinx.serialization.json)
-
-    implementation(libs.androidx.lifecycle.livedata.ktx)
-
-
-    implementation(libs.androidx.swiperefreshlayout)
-    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -71,20 +61,16 @@ dependencies {
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.room)
-    implementation(libs.generativeai)
-    implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
-
-    implementation(libs.moshi.kotlin)
-    ksp(libs.moshi.kotlin.codegen)
-
     implementation(platform(libs.firebase))
     implementation(libs.firebase.messaging)
     implementation(libs.play.services)
-    implementation(libs.okhttp)
+    implementation(libs.converter.gson)
+    implementation(libs.logging.interceptor)
+    implementation(libs.glide)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.imagepicker)
+    implementation(libs.ucrop)
     coreLibraryDesugaring(libs.desugaring)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
 }

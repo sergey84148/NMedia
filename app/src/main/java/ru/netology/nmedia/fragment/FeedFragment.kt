@@ -1,6 +1,7 @@
 package ru.netology.nmedia.fragment
 
 import android.content.Intent
+import android.content.res.Resources
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -66,12 +67,6 @@ class FeedFragment : Fragment() {
                 startActivity(shareIntent)
             }
 
-            override fun onOpenPost(post: Post) {
-                val bundle = Bundle().apply {
-                    putLong("postId", post.id)
-                }
-                findNavController().navigate(R.id.action_feedFragment_to_postDetailFragment, bundle)
-            }
         })
 
         binding.list.adapter = adapter
@@ -234,9 +229,26 @@ class FeedFragment : Fragment() {
 
     private fun updateBannerText(binding: FragmentFeedBinding, count: Int) {
         binding.bannerText.text = when {
-            count > 1 -> String.format(getString(R.string.new_posts_banner), count)
-            count == 1 -> getString(R.string.new_post_banner)
-            else -> String.format(getString(R.string.new_posts_banner), 0)
+            count > 1 -> {
+                val text = when (Resources.getSystem().configuration.locales[0].language) {
+                    "ru" -> "Новых постов: %d"
+                    else -> "New posts: %d"
+                }
+                String.format(text, count)
+            }
+            count == 1 -> {
+                when (Resources.getSystem().configuration.locales[0].language) {
+                    "ru" -> "Новый пост"
+                    else -> "New post"
+                }
+            }
+            else -> {
+                val text = when (Resources.getSystem().configuration.locales[0].language) {
+                    "ru" -> "Новых постов: %d"
+                    else -> "New posts: %d"
+                }
+                String.format(text, 0)
+            }
         }
     }
 

@@ -6,4 +6,6 @@ enum class SyncState {
     PENDING_DELETE, // Ожидает удаления
     SYNCING,     // В процессе синхронизации
     FAILED       // Ошибка синхронизации
+    ,
+    DONE
 }

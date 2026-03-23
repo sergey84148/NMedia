@@ -1,6 +1,7 @@
 package ru.netology.nmedia.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.*
 import kotlinx.coroutines.Dispatchers
@@ -8,27 +9,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.db.AppDb
+import ru.netology.nmedia.dto.MediaUpload
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
 import ru.netology.nmedia.model.FeedModel
 import ru.netology.nmedia.model.FeedModelState
+import ru.netology.nmedia.model.PhotoModel
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.repository.PostRepositoryImpl
 import ru.netology.nmedia.util.SingleLiveEvent
 import ru.netology.nmedia.utils.RetryPolicy
-
-val emptyTemplate: Post = Post(
-    id = 0L,
-    author = "",
-    authorAvatar = "",
-    content = "",
-    published = System.currentTimeMillis() / 1000,  // Текущее время в секундах
-    likedByMe = false,
-    likes = 0,
-    shares = 0,
-    video = null,
-    attachment = null
-)
+import java.io.File
 
 class PostViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: PostRepository = PostRepositoryImpl(
@@ -43,7 +34,10 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         .map { posts -> FeedModel(posts) }
         .asLiveData(Dispatchers.Default)
 
-    val edited = MutableLiveData(emptyTemplate)
+    val edited = MutableLiveData(emptyPost)
+    private val _photo = MutableLiveData<PhotoModel?>(null)
+    val photo: LiveData<PhotoModel?>
+        get() = _photo
 
     private val _postCreated = SingleLiveEvent<Unit>()
     val postCreated: LiveData<Unit>
@@ -67,6 +61,21 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     private var lastVisiblePostId = 0L
 
+    companion object {
+        val emptyPost = Post(
+            id = 0L,
+            author = "",
+            authorAvatar = "",
+            content = "",
+            published = System.currentTimeMillis() / 1000,
+            likedByMe = false,
+            likes = 0,
+            shares = 0,
+            video = null,
+            attachment = null
+        )
+    }
+
     init {
         loadPosts()
 
@@ -77,7 +86,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // 👇 ИСПОЛЬЗУЕМ FLOW ИЗ РЕПОЗИТОРИЯ для отслеживания новых постов
         viewModelScope.launch {
             repository.newPostsCount.collect { count ->
                 if (count > 0) {
@@ -90,7 +98,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Отслеживание состояния сети
         viewModelScope.launch {
             RetryPolicy.observeNetwork(getApplication()).collect { isConnected ->
                 _isNetworkAvailable.postValue(isConnected)
@@ -106,7 +113,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Получаем ID последнего поста при загрузке
         viewModelScope.launch {
             delay(1000)
             updateLastVisiblePostId()
@@ -156,15 +162,12 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // 👇 Теперь этот метод только инициирует проверку,
-    // но основное обновление происходит через Flow
     fun checkForNewPosts() {
         viewModelScope.launch {
             try {
                 val currentLastId = lastVisiblePostId
                 Log.d("PostViewModel", "Manual check for new posts after ID: $currentLastId")
                 repository.checkForNewPosts(currentLastId)
-                // Flow автоматически обновит _newPostsCount
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error checking new posts", e)
             }
@@ -195,36 +198,37 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun save(content: String) {
+    fun save() {
         edited.value?.let { post ->
-            val trimmedContent = content.trim()
-            if (trimmedContent.isNotBlank()) {
-                viewModelScope.launch {
-                    try {
-                        // 👇 ВАЖНО: при сохранении обновляем timestamp
-                        val postToSave = post.copy(
-                            content = trimmedContent,
-                            published = System.currentTimeMillis() / 1000  // Обновляем время публикации
-                        )
-                        val savedPost = repository.save(postToSave)
-                        _postCreated.postValue(Unit)
-                        Log.d("PostViewModel", "Post saved successfully: $savedPost")
-
-                        if (_syncState.value == SyncState.FAILED) {
-                            _state.value = _state.value?.copy(syncError = true)
+            _postCreated.value = Unit
+            viewModelScope.launch {
+                try {
+                    if (_photo.value != null) {
+                        _photo.value?.file?.let { file ->
+                            repository.saveWithAttachment(post, MediaUpload(file))
                         }
-                    } catch (e: Exception) {
-                        Log.e("PostViewModel", "Save post error:", e)
-                        _state.value = _state.value?.copy(error = true)
+                    } else {
+                        repository.save(post)
                     }
+                    clearEditing()
+                } catch (e: Exception) {
+                    _state.value = _state.value?.copy(error = true)
+                    Log.e("PostViewModel", "Save error: ${e.message}", e)
                 }
             }
         }
-        edited.postValue(emptyTemplate)
     }
 
     fun edit(post: Post) {
         edited.value = post
+    }
+
+    fun changeContent(content: String) {
+        val text = content.trim()
+        if (edited.value?.content == text) {
+            return
+        }
+        edited.value = edited.value?.copy(content = text)
     }
 
     fun likeById(id: Long) {
@@ -284,5 +288,18 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() {
         _state.value = _state.value?.copy(error = false, syncError = false)
+    }
+
+    fun changePhoto(uri: Uri?, file: File?) {
+        _photo.value = PhotoModel(uri, file)
+    }
+
+    fun removePhoto() {
+        _photo.value = null
+    }
+
+    fun clearEditing() {
+        edited.value = emptyPost
+        _photo.value = null
     }
 }
