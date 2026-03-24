@@ -1,8 +1,11 @@
+// entity/PostEntity.kt
 package ru.netology.nmedia.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import ru.netology.nmedia.dto.Attachment
 import ru.netology.nmedia.dto.Post
+import ru.netology.nmedia.enumeration.AttachmentType
 import ru.netology.nmedia.enumeration.SyncState
 
 @Entity(tableName = "PostEntity")
@@ -11,7 +14,7 @@ data class PostEntity(
     val id: Long = 0,
     val serverId: Long? = null,
     val author: String = "",
-    val authorAvatar: String = "",  // 👈 ИЗМЕНЕНО: теперь String, не nullable
+    val authorAvatar: String = "",
     val content: String = "",
     val published: Long = 0,
     var likes: Int = 0,
@@ -21,24 +24,34 @@ data class PostEntity(
     val syncState: SyncState = SyncState.SYNCED,
     val lastModified: Long = System.currentTimeMillis(),
     val retryCount: Int = 0,
-    val isNew: Boolean = false
+    val isNew: Boolean = false,
+    // 👇 ПОЛЯ ДЛЯ ВЛОЖЕНИЯ
+    val attachmentUrl: String? = null,
+    val attachmentDescription: String? = null,
+    val attachmentType: AttachmentType? = null
 ) {
     fun toDto(): Post = Post(
         id = serverId ?: 0L,
         author = author,
-        authorAvatar = authorAvatar,  // Теперь String
+        authorAvatar = authorAvatar,
         content = content,
         published = published,
         likedByMe = likedByMe,
         likes = likes,
         shares = shares,
         video = video,
-        attachment = null
+        attachment = if (attachmentUrl != null && attachmentType != null) {
+            Attachment(
+                url = attachmentUrl,
+                description = attachmentDescription,
+                type = attachmentType
+            )
+        } else null
     )
 
     companion object {
         fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity = PostEntity(
-            id = dto.id, // <----
+            id = 0,
             serverId = dto.id.takeIf { it != 0L },
             author = dto.author,
             authorAvatar = dto.authorAvatar ?: "",
@@ -50,7 +63,11 @@ data class PostEntity(
             likedByMe = dto.likedByMe,
             syncState = syncState,
             lastModified = System.currentTimeMillis(),
-            isNew = isNew
+            isNew = isNew,
+
+            attachmentUrl = dto.attachment?.url,
+            attachmentDescription = dto.attachment?.description,
+            attachmentType = dto.attachment?.type
         )
     }
 }

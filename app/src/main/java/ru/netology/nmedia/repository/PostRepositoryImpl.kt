@@ -278,10 +278,8 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             // Создаем пост с прикрепленным медиа
             val postWithAttachment = post.copy(
                 attachment = Attachment(
-                    id = uploadedMedia.id,
+                    url = uploadedMedia.id,
                     type = AttachmentType.IMAGE,
-                    url = uploadedMedia.url,
-                    description = ""  // description не используется, ставим пустую строку
                 )
             )
 
