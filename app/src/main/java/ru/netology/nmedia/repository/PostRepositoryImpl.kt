@@ -123,11 +123,11 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
     }
 
     override suspend fun getNewPostsCount(): Int {
-        return 0 // Реализуйте логику подсчета новых постов
+        return dao.getNewPostsCount()
     }
 
     override suspend fun showNewPosts() {
-        // Реализация показа новых постов
+        dao.markAllAsVisible()
     }
 
     override suspend fun dislikeById(id: Long): Post = likeById(id)
@@ -171,8 +171,8 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
 
     override val newPostsCount: Flow<Int> = flow {
         while (true) {
-            delay(10_000L)
-            val count = getNewPostsCount()
+            delay(30_000L)
+            val count = dao.getNewPostsCount()
             emit(count)
         }
     }.flowOn(Dispatchers.Default)
@@ -226,7 +226,6 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
         val entity = findPostById(id)
             ?: throw IllegalArgumentException("Post with id $id not found")
 
-        // Получаем DTO для работы с лайками
         val postDto = entity.toDto()
 
         val updatedPostDto = postDto.copy(
@@ -253,37 +252,47 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             } else {
                 PostsApi.service.likeById(entity.serverId)
             }
+            val serverPostBody = serverPost.body() ?: updatedPostDto
 
             val syncedEntity = updatedEntity.copy(
                 syncState = SyncState.SYNCED,
-                retryCount = 0
+                retryCount = 0,
+                likes = serverPostBody.likes,
+                likedByMe = serverPostBody.likedByMe
             )
             dao.update(syncedEntity)
-            serverPost
+            serverPostBody
         } catch (exception: Exception) {
             Log.e("PostRepository", "Like/Dislike API error", exception)
             _syncState.value = SyncState.FAILED
             updatedPostDto
-        } as Post
+        }
     }
 
+    // 👇 ИСПРАВЛЕННЫЙ МЕТОД saveWithAttachment - убрал description
     override suspend fun saveWithAttachment(post: Post, media: MediaUpload): Post {
         try {
+            // Сначала загружаем медиафайл
             val uploadedMedia = upload(media.file)
+
+            // Создаем пост с прикрепленным медиа
             val postWithAttachment = post.copy(
                 attachment = Attachment(
                     id = uploadedMedia.id,
                     type = AttachmentType.IMAGE,
                     url = uploadedMedia.url,
-                    description = "" // Добавляем параметр description
+                    description = ""  // description не используется, ставим пустую строку
                 )
             )
+
+            // Сохраняем пост
             return save(postWithAttachment)
         } catch (e: AppError) {
             throw e
         } catch (e: IOException) {
             throw NetworkError()
         } catch (e: Exception) {
+            Log.e("PostRepository", "Error saving with attachment", e)
             throw UnknownError()
         }
     }

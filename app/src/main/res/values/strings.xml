@@ -38,4 +38,6 @@
     <string name="new_posts_banner" translatable="false">new_posts_banner</string>
     <string name="new_post_banner" translatable="false">new_post_banner</string>
     <string name="image_picker_error">image_picker_error</string>
+    <string name="notification_permission_granted">notification_permission_granted</string>
+    <string name="notification_permission_denied">notification_permission_denied</string>
 </resources>

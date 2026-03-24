@@ -27,11 +27,14 @@ class AppActivity : AppCompatActivity() {
 
         val binding = ActivityAppBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        setSupportActionBar(binding.actionBar)
+
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
         requestNotificationsPermission()
 
         intent?.let {
@@ -50,10 +53,13 @@ class AppActivity : AppCompatActivity() {
             }
 
             intent.removeExtra(Intent.EXTRA_TEXT)
-            findNavController(R.id.newPostFragment).navigate(
+
+            // Исправленная навигация с передачей текста
+            val navController = findNavController(R.id.fragment_container)
+            navController.navigate(
                 R.id.action_feedFragment_to_newPostFragment,
                 Bundle().apply {
-                   // textArg = text
+                    putString("textArg", text)
                 }
             )
         }
@@ -74,10 +80,31 @@ class AppActivity : AppCompatActivity() {
         requestPermissions(arrayOf(permission), 1)
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Разрешение получено
+                Toast.makeText(this, R.string.notification_permission_granted, Toast.LENGTH_SHORT).show()
+            } else {
+                // Разрешение не получено
+                Toast.makeText(this, R.string.notification_permission_denied, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun checkGoogleApiAvailability() {
         with(GoogleApiAvailability.getInstance()) {
             val code = isGooglePlayServicesAvailable(this@AppActivity)
             if (code == ConnectionResult.SUCCESS) {
+                // Google Play Services доступны
+                FirebaseMessaging.getInstance().token.addOnSuccessListener {
+                    println("FCM Token: $it")
+                }
                 return@with
             }
             if (isUserResolvableError(code)) {
@@ -85,10 +112,6 @@ class AppActivity : AppCompatActivity() {
                 return
             }
             Toast.makeText(this@AppActivity, R.string.google_play_unavailable, Toast.LENGTH_LONG).show()
-        }
-
-        FirebaseMessaging.getInstance().token.addOnSuccessListener {
-            println(it)
         }
     }
 }

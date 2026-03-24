@@ -39,6 +39,12 @@ interface PostDao {
 
     @Update
     suspend fun update(post: PostEntity)
+    @Query("SELECT COUNT(*) FROM PostEntity WHERE isNew = 1")
+    suspend fun getNewPostsCount(): Int
+
+    @Query("UPDATE PostEntity SET isNew = 0 WHERE isNew = 1")
+    suspend fun markAllAsVisible()
+
 }
 
 class Converters {

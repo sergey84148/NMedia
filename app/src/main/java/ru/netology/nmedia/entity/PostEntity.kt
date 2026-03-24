@@ -38,7 +38,7 @@ data class PostEntity(
 
     companion object {
         fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity = PostEntity(
-            id = 0,
+            id = dto.id, // <----
             serverId = dto.id.takeIf { it != 0L },
             author = dto.author,
             authorAvatar = dto.authorAvatar ?: "",

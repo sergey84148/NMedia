@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.implementation
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -73,4 +74,7 @@ dependencies {
     implementation(libs.imagepicker)
     implementation(libs.ucrop)
     coreLibraryDesugaring(libs.desugaring)
+    implementation (libs.glide.v4160)
 }
+
+

@@ -67,6 +67,13 @@ class FeedFragment : Fragment() {
                 startActivity(shareIntent)
             }
 
+            // 👇 ДОБАВЬТЕ ЭТОТ МЕТОД для открытия фото
+            override fun onOpenPhoto(url: String) {
+                val bundle = Bundle().apply {
+                    putString("url", url)
+                }
+                findNavController().navigate(R.id.action_feedFragment_to_photoFragment, bundle)
+            }
         })
 
         binding.list.adapter = adapter
@@ -160,13 +167,11 @@ class FeedFragment : Fragment() {
 
         // Наблюдаем за созданием поста для обновления ID последнего видимого поста
         viewModel.postCreated.observe(viewLifecycleOwner) {
-            // Теперь не suspend и может быть вызван напрямую
             viewModel.updateLastVisiblePostId()
         }
     }
 
     private fun setupNewPostsBanner(binding: FragmentFeedBinding) {
-        // Устанавливаем обработчик нажатия на плашку
         binding.newPostsBanner.setOnClickListener {
             viewModel.onNewPostsBannerClicked()
             smoothScrollToTop(binding)
@@ -181,7 +186,6 @@ class FeedFragment : Fragment() {
                 val layoutManager = recyclerView.layoutManager as LinearLayoutManager
                 val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
 
-                // Если мы наверху списка, автоматически скрываем баннер
                 if (firstVisibleItemPosition == 0 && isBannerVisible) {
                     val firstItemView = layoutManager.findViewByPosition(0)
                     if (firstItemView != null && firstItemView.top >= 0) {
@@ -220,8 +224,6 @@ class FeedFragment : Fragment() {
 
     private fun smoothScrollToTop(binding: FragmentFeedBinding) {
         binding.list.smoothScrollToPosition(0)
-
-        // Альтернатива с более плавной анимацией
         binding.list.post {
             binding.list.smoothScrollToPosition(0)
         }
@@ -254,13 +256,11 @@ class FeedFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // При возвращении на экран проверяем новые посты
         viewModel.checkForNewPosts()
     }
 
     override fun onPause() {
         super.onPause()
-        // Скрываем плашку при уходе с экрана
         binding?.let {
             if (isBannerVisible) {
                 hideNewPostsBanner(it)

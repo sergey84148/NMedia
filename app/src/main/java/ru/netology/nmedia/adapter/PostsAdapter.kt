@@ -1,8 +1,13 @@
 package ru.netology.nmedia.adapter
 
+import android.content.Context
+import android.content.Intent
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
+import android.widget.Toast
+import androidx.core.net.toUri
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -11,16 +16,21 @@ import ru.netology.nmedia.databinding.CardPostBinding
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.util.ImageLoader
 
+// Интерфейс для обработки взаимодействий с элементами списка
 interface OnInteractionListener {
     fun onLike(post: Post) {}
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
+    fun onOpenPost(post: Post) {}
+    fun onOpenPhoto(url: String) {}  // 👈 ДОБАВЛЕН МЕТОД
 }
 
+// Адаптер для отображения постов
 class PostsAdapter(
     private val onInteractionListener: OnInteractionListener,
-) : ListAdapter<Post, PostViewHolder>(PostDiffCallback()) {
+) : ListAdapter<Post, PostViewHolder>(PostDiffCallback) {
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostViewHolder {
         val binding = CardPostBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return PostViewHolder(binding, onInteractionListener)
@@ -33,26 +43,47 @@ class PostsAdapter(
 }
 
 class PostViewHolder(
-    private val binding: CardPostBinding,
+    internal val binding: CardPostBinding,
     private val onInteractionListener: OnInteractionListener,
 ) : RecyclerView.ViewHolder(binding.root) {
 
     fun bind(post: Post) {
         binding.apply {
             author.text = post.author
-            published.text = post.published.toString()
             content.text = post.content
 
-            // Используем ImageLoader для загрузки аватара - исправлено имя параметра
-            ImageLoader.loadAvatar(
-                context = binding.root.context,
-                avatarName = post.authorAvatar,  // изменено с avatarUrl на avatarName
-                imageView = avatar
-            )
-
             like.isChecked = post.likedByMe
-            like.text = "${post.likes}"
-            share.text = "${post.shares}"
+            like.text = post.likes.toString()
+
+            ImageLoader.loadAvatar(itemView.context, post.authorAvatar, avatar)
+
+            // 👇 ОБРАБОТКА ВЛОЖЕНИЯ (ИЗОБРАЖЕНИЯ)
+            if (post.attachment != null) {
+                attachmentContainer.visibility = View.VISIBLE
+
+                // Загружаем изображение
+                ImageLoader.loadPostAttachment(
+                    context = itemView.context,
+                    attachment = post.attachment,
+                    imageView = attachmentImage
+                )
+
+                // Отображаем описание, если есть
+                if (!post.attachment!!.description.isNullOrEmpty()) {
+                    attachmentDescription.text = post.attachment!!.description
+                    attachmentDescription.visibility = View.VISIBLE
+                } else {
+                    attachmentDescription.visibility = View.GONE
+                }
+
+                // 👇 ОБРАБОТЧИК КЛИКА НА ИЗОБРАЖЕНИЕ
+                attachmentImage.setOnClickListener {
+                    val fullUrl = "http://10.0.2.2:9999/media/${post.attachment!!.url}"
+                    onInteractionListener.onOpenPhoto(fullUrl)
+                }
+            } else {
+                attachmentContainer.visibility = View.GONE
+            }
 
             menu.setOnClickListener {
                 PopupMenu(it.context, it).apply {
@@ -84,12 +115,10 @@ class PostViewHolder(
     }
 }
 
-class PostDiffCallback : DiffUtil.ItemCallback<Post>() {
-    override fun areItemsTheSame(oldItem: Post, newItem: Post): Boolean {
-        return oldItem.id == newItem.id
-    }
+object PostDiffCallback : DiffUtil.ItemCallback<Post>() {
+    override fun areItemsTheSame(oldItem: Post, newItem: Post): Boolean =
+        oldItem.id == newItem.id
 
-    override fun areContentsTheSame(oldItem: Post, newItem: Post): Boolean {
-        return oldItem == newItem
-    }
+    override fun areContentsTheSame(oldItem: Post, newItem: Post): Boolean =
+        oldItem == newItem
 }
