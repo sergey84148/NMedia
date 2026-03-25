@@ -42,7 +42,7 @@ object ImageLoader {
         val fullUrl = if (attachment.url.startsWith("http")) {
             attachment.url // если уже полный URL, используем как есть
         } else {
-            "$BASE_URL/images/${attachment.url}"
+            "http://10.0.2.2:9999/media/${attachment.url}"
         }
 
         Log.d("ImageLoader", "Loading post attachment from: $fullUrl")

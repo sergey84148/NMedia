@@ -253,10 +253,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleLike(post: Post) {
-        likeById(post.id)
-    }
-
     fun shareById(id: Long) {
         viewModelScope.launch {
             try {
