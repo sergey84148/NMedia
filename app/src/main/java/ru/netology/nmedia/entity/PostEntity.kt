@@ -24,7 +24,6 @@ data class PostEntity(
     val lastModified: Long = System.currentTimeMillis(),
     val retryCount: Int = 0,
     val isNew: Boolean = false,
-    // 👇 ПОЛЯ ДЛЯ ВЛОЖЕНИЯ
     val attachmentUrl: String? = null,
     val attachmentDescription: String? = null,
     val attachmentType: AttachmentType? = null
@@ -50,17 +49,9 @@ data class PostEntity(
 
     companion object {
         // 👇 ИСПРАВЛЕНО: для существующих постов используем serverId для поиска
-        fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity {
-
-            val existingId = if (dto.id != 0L) {
-
-                dto.id
-            } else {
-                0L
-            }
-
-            return PostEntity(
-                id = 0, // ВСЕГДА 0 для вставки, Room сам сгенерирует ID
+        fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity =
+            PostEntity(
+                id = dto.id, // используем серверный id, если будет необходимо вставить только локально, то передадим извне копию поста с id = 0L
                 serverId = dto.id.takeIf { it != 0L },
                 author = dto.author,
                 authorAvatar = dto.authorAvatar ?: "",
@@ -77,26 +68,8 @@ data class PostEntity(
                 attachmentDescription = dto.attachment?.description,
                 attachmentType = dto.attachment?.type
             )
-        }
 
-        // 👇 НОВЫЙ МЕТОД для обновления существующего поста
-        fun fromDtoWithId(id: Long, dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity = PostEntity(
-            id = id,
-            serverId = dto.id.takeIf { it != 0L },
-            author = dto.author,
-            authorAvatar = dto.authorAvatar ?: "",
-            content = dto.content,
-            published = dto.published,
-            likes = dto.likes,
-            shares = dto.shares,
-            video = dto.video,
-            likedByMe = dto.likedByMe,
-            syncState = syncState,
-            lastModified = System.currentTimeMillis(),
-            isNew = isNew,
-            attachmentUrl = dto.attachment?.url,
-            attachmentDescription = dto.attachment?.description,
-            attachmentType = dto.attachment?.type
-        )
+
+
     }
 }
