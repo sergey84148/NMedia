@@ -13,7 +13,8 @@ data class PostEntity(
     val id: Long = 0,
     val serverId: Long? = null,
     val author: String = "",
-    val authorAvatar: String = "",
+    val authorId: Long = 0,  // 👈 ДОБАВЛЯЕМ поле authorId
+    val authorAvatar: String? = null,
     val content: String = "",
     val published: Long = 0,
     var likes: Int = 0,
@@ -31,7 +32,8 @@ data class PostEntity(
     fun toDto(): Post = Post(
         id = serverId ?: 0L,
         author = author,
-        authorAvatar = authorAvatar,
+        authorId = authorId,  // 👈 добавляем в DTO
+        authorAvatar = authorAvatar ?: "",
         content = content,
         published = published,
         likedByMe = likedByMe,
@@ -48,28 +50,48 @@ data class PostEntity(
     )
 
     companion object {
-        // 👇 ИСПРАВЛЕНО: для существующих постов используем serverId для поиска
-        fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity =
-            PostEntity(
-                id = dto.id, // используем серверный id, если будет необходимо вставить только локально, то передадим извне копию поста с id = 0L
-                serverId = dto.id.takeIf { it != 0L },
-                author = dto.author,
-                authorAvatar = dto.authorAvatar ?: "",
-                content = dto.content,
-                published = dto.published,
-                likes = dto.likes,
-                shares = dto.shares,
-                video = dto.video,
-                likedByMe = dto.likedByMe,
-                syncState = syncState,
-                lastModified = System.currentTimeMillis(),
-                isNew = isNew,
-                attachmentUrl = dto.attachment?.url,
-                attachmentDescription = dto.attachment?.description,
-                attachmentType = dto.attachment?.type
-            )
+        fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity = PostEntity(
+            id = 0,
+            serverId = dto.id.takeIf { it != 0L },
+            author = dto.author,
+            authorId = dto.authorId,  // 👈 добавляем
+            authorAvatar = dto.authorAvatar,
+            content = dto.content,
+            published = dto.published,
+            likes = dto.likes,
+            shares = dto.shares,
+            video = dto.video,
+            likedByMe = dto.likedByMe,
+            syncState = syncState,
+            lastModified = System.currentTimeMillis(),
+            isNew = isNew,
+            attachmentUrl = dto.attachment?.url,
+            attachmentDescription = dto.attachment?.description,
+            attachmentType = dto.attachment?.type
+        )
 
-
-
+        fun updateFromDto(
+            existingEntity: PostEntity,
+            dto: Post,
+            syncState: SyncState = SyncState.SYNCED,
+            isNew: Boolean = false
+        ): PostEntity = existingEntity.copy(
+            serverId = dto.id.takeIf { it != 0L },
+            author = dto.author,
+            authorId = dto.authorId,  // 👈 добавляем
+            authorAvatar = dto.authorAvatar,
+            content = dto.content,
+            published = dto.published,
+            likes = dto.likes,
+            shares = dto.shares,
+            video = dto.video,
+            likedByMe = dto.likedByMe,
+            syncState = syncState,
+            lastModified = System.currentTimeMillis(),
+            isNew = isNew,
+            attachmentUrl = dto.attachment?.url,
+            attachmentDescription = dto.attachment?.description,
+            attachmentType = dto.attachment?.type
+        )
     }
 }

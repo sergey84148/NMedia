@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -18,11 +19,13 @@ import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.databinding.FragmentFeedBinding
 import ru.netology.nmedia.dto.Post
+import ru.netology.nmedia.viewmodel.AuthViewModel
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class FeedFragment : Fragment() {
 
     private val viewModel: PostViewModel by activityViewModels()
+    private val authViewModel: AuthViewModel by activityViewModels()
     private var binding: FragmentFeedBinding? = null
     private var isBannerVisible = false
 
@@ -39,25 +42,39 @@ class FeedFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val binding = this.binding!!
 
-        // Настройка плашки "Свежие записи"
         setupNewPostsBanner(binding)
 
-        // Адаптер для RecyclerView
         val adapter = PostsAdapter(object : OnInteractionListener {
             override fun onEdit(post: Post) {
+                if (!isAuthenticated()) {
+                    showAuthDialog()
+                    return
+                }
                 viewModel.edit(post)
                 findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
             }
 
             override fun onLike(post: Post) {
+                if (!isAuthenticated()) {
+                    showAuthDialog()
+                    return
+                }
                 viewModel.likeById(post.id)
             }
 
             override fun onRemove(post: Post) {
+                if (!isAuthenticated()) {
+                    showAuthDialog()
+                    return
+                }
                 viewModel.removeById(post.id)
             }
 
             override fun onShare(post: Post) {
+                if (!isAuthenticated()) {
+                    showAuthDialog()
+                    return
+                }
                 val intent = Intent().apply {
                     action = Intent.ACTION_SEND
                     putExtra(Intent.EXTRA_TEXT, post.content)
@@ -67,7 +84,6 @@ class FeedFragment : Fragment() {
                 startActivity(shareIntent)
             }
 
-            // 👇 ДОБАВЬТЕ ЭТОТ МЕТОД для открытия фото
             override fun onOpenPhoto(url: String) {
                 val bundle = Bundle().apply {
                     putString("url", url)
@@ -79,29 +95,28 @@ class FeedFragment : Fragment() {
         binding.list.adapter = adapter
         setupRecyclerViewScrollListener(binding)
 
-        // Обработчик свайпа вниз для синхронизации
         binding.swipeRefreshLayout.setOnRefreshListener {
+            if (!isAuthenticated()) {
+                showAuthDialog()
+                binding.swipeRefreshLayout.isRefreshing = false
+                return@setOnRefreshListener
+            }
             viewModel.syncWithServer()
-            // Не скрываем сразу, показываем прогресс
-            viewModel.state.observe(viewLifecycleOwner) { state ->
-                if (!state.syncing) {
-                    binding.swipeRefreshLayout.isRefreshing = false
-                }
+            viewModel.data.observe(viewLifecycleOwner) { feedModel ->
+                adapter.submitList(feedModel.posts)
+                binding.empty.isVisible = feedModel.posts.isEmpty()
             }
         }
 
-        // Наблюдение за состоянием данных
         viewModel.data.observe(viewLifecycleOwner) { feedModel ->
             adapter.submitList(feedModel.posts)
             binding.empty.isVisible = feedModel.posts.isEmpty()
         }
 
-        // Наблюдение за состоянием загрузки и ошибок
         viewModel.state.observe(viewLifecycleOwner) { state ->
             binding.progress.isVisible = state.loading
             binding.syncProgress.isVisible = state.syncing
 
-            // Обработка ошибок загрузки
             if (state.error) {
                 binding.errorGroup.isVisible = true
                 binding.retryButton.setOnClickListener {
@@ -112,7 +127,6 @@ class FeedFragment : Fragment() {
                 binding.errorGroup.isVisible = false
             }
 
-            // Обновление текста сообщения об отсутствии сети с количеством ожидающих постов
             if (state.pendingPostsCount > 0 && viewModel.isNetworkAvailable.value == false) {
                 binding.noConnectionMessage.text = getString(
                     R.string.sync_error_with_count,
@@ -127,10 +141,8 @@ class FeedFragment : Fragment() {
             }
         }
 
-        // Наблюдение за состоянием сети
         viewModel.showNoConnectionMessage.observe(viewLifecycleOwner) { show ->
             if (show == true) {
-                // Проверяем, есть ли ожидающие посты для отображения правильного сообщения
                 viewModel.state.value?.let { state ->
                     if (state.pendingPostsCount > 0) {
                         binding.noConnectionMessage.text = getString(
@@ -147,7 +159,6 @@ class FeedFragment : Fragment() {
             }
         }
 
-        // Наблюдение за плашкой новых постов
         viewModel.showNewPostsBanner.observe(viewLifecycleOwner) { show ->
             if (show == true && !isBannerVisible) {
                 showNewPostsBanner(binding)
@@ -160,15 +171,35 @@ class FeedFragment : Fragment() {
             updateBannerText(binding, count ?: 0)
         }
 
-        // Кнопка FAB для создания нового поста
         binding.fab.setOnClickListener {
+            if (!isAuthenticated()) {
+                showAuthDialog()
+                return@setOnClickListener
+            }
             findNavController().navigate(R.id.action_feedFragment_to_newPostFragment)
         }
 
-        // Наблюдаем за созданием поста для обновления ID последнего видимого поста
         viewModel.postCreated.observe(viewLifecycleOwner) {
             viewModel.updateLastVisiblePostId()
         }
+    }
+
+    private fun isAuthenticated(): Boolean {
+        return authViewModel.authenticated.value == true
+    }
+
+    private fun showAuthDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Требуется авторизация")
+            .setMessage("Для выполнения этого действия необходимо войти в аккаунт")
+            .setPositiveButton("Войти") { _, _ ->
+                findNavController().navigate(R.id.action_feedFragment_to_loginFragment)
+            }
+            .setNegativeButton("Отмена", null)
+            .setNeutralButton("Зарегистрироваться") { _, _ ->
+                findNavController().navigate(R.id.action_feedFragment_to_registerFragment)
+            }
+            .show()
     }
 
     private fun setupNewPostsBanner(binding: FragmentFeedBinding) {

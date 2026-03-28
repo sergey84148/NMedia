@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.net.toFile
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
@@ -17,6 +18,7 @@ import ru.netology.nmedia.R
 import ru.netology.nmedia.databinding.FragmentNewPostBinding
 import ru.netology.nmedia.util.AndroidUtils
 import ru.netology.nmedia.util.StringArg
+import ru.netology.nmedia.viewmodel.AuthViewModel
 import ru.netology.nmedia.viewmodel.PostViewModel
 
 class NewPostFragment : Fragment() {
@@ -26,7 +28,7 @@ class NewPostFragment : Fragment() {
     }
 
     private val viewModel: PostViewModel by activityViewModels()
-
+    private val authViewModel: AuthViewModel by activityViewModels()
     private var fragmentBinding: FragmentNewPostBinding? = null
 
     override fun onCreateView(
@@ -40,6 +42,12 @@ class NewPostFragment : Fragment() {
             false
         )
         fragmentBinding = binding
+
+        // Проверяем авторизацию
+        if (authViewModel.authenticated.value != true) {
+            showAuthDialog()
+            return binding.root
+        }
 
         arguments?.textArg
             ?.let(binding.edit::setText)
@@ -124,6 +132,23 @@ class NewPostFragment : Fragment() {
         }, viewLifecycleOwner)
 
         return binding.root
+    }
+
+    private fun showAuthDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Требуется авторизация")
+            .setMessage("Для создания поста необходимо войти в аккаунт")
+            .setPositiveButton("Войти") { _, _ ->
+                findNavController().navigate(R.id.action_feedFragment_to_loginFragment)
+            }
+            .setNegativeButton("Отмена") { _, _ ->
+                findNavController().navigateUp()
+            }
+            .setNeutralButton("Зарегистрироваться") { _, _ ->
+                findNavController().navigate(R.id.action_feedFragment_to_registerFragment)
+            }
+            .setCancelable(false)
+            .show()
     }
 
     override fun onDestroyView() {

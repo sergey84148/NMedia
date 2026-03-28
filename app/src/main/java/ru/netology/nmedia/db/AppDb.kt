@@ -9,7 +9,11 @@ import ru.netology.nmedia.dao.Converters
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.entity.PostEntity
 
-@Database(entities = [PostEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [PostEntity::class],
+    version = 6,  // Увеличьте версию
+    exportSchema = false
+)
 @TypeConverters(Converters::class)
 abstract class AppDb : RoomDatabase() {
     abstract fun postDao(): PostDao
@@ -30,7 +34,7 @@ abstract class AppDb : RoomDatabase() {
                 AppDb::class.java,
                 "app.db"
             )
-                .fallbackToDestructiveMigration() // Это удалит старую базу и создаст новую
+                .fallbackToDestructiveMigration()
                 .build()
         }
     }

@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import ru.netology.nmedia.auth.AppAuth
 import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.dto.MediaUpload
 import ru.netology.nmedia.dto.Post
@@ -30,9 +31,8 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     val state: LiveData<FeedModelState>
         get() = _state
 
-    val data: LiveData<FeedModel> = repository.data
-        .map { posts -> FeedModel(posts) }
-        .asLiveData(Dispatchers.Default)
+    private val _data = MutableLiveData<FeedModel>()
+    val data: LiveData<FeedModel> = _data
 
     val edited = MutableLiveData(emptyPost)
     private val _photo = MutableLiveData<PhotoModel?>(null)
@@ -65,9 +65,10 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         val emptyPost = Post(
             id = 0L,
             author = "",
+            authorId = 0,
             authorAvatar = "",
             content = "",
-            published = System.currentTimeMillis() / 1000,
+            published = 0,
             likedByMe = false,
             likes = 0,
             shares = 0,
@@ -77,7 +78,30 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        loadPosts()
+        viewModelScope.launch {
+            while (!AppAuth.isInitialized()) {
+                delay(100)
+            }
+
+            AppAuth.getInstance().authStateFlow.collect { authState ->
+                if (authState.token != null && authState.id != 0L) {
+                    loadPosts()
+                } else {
+                    _data.postValue(FeedModel(emptyList()))
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            repository.data.collect { posts ->
+                val currentAuth = AppAuth.getInstance().authStateFlow.value
+                val feedModel = FeedModel(
+                    posts = posts.map { it.copy(ownedByMe = it.authorId == currentAuth.id) }
+                )
+                _data.postValue(feedModel)
+                updateLastVisiblePostId()
+            }
+        }
 
         viewModelScope.launch {
             repository.getSyncState().collect { syncState ->
@@ -125,7 +149,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateLastVisiblePostId() {
         viewModelScope.launch {
-            data.value?.posts?.firstOrNull()?.let { firstPost ->
+            _data.value?.posts?.firstOrNull()?.let { firstPost ->
                 lastVisiblePostId = firstPost.id
                 Log.d("PostViewModel", "Last visible post ID set to: $lastVisiblePostId")
             }
@@ -149,12 +173,16 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadPosts() {
+        if (!AppAuth.isInitialized() || AppAuth.getInstance().authStateFlow.value.token == null) {
+            Log.d("PostViewModel", "Not authorized, skipping load")
+            return
+        }
+
         _state.value = _state.value?.copy(loading = true)
         viewModelScope.launch {
             try {
                 repository.getAllAsync()
                 _state.value = _state.value?.copy(loading = false, error = false)
-                updateLastVisiblePostId()
             } catch (e: Exception) {
                 _state.value = _state.value?.copy(loading = false, error = true)
                 Log.e("PostViewModel", "Load posts error: ${e.message}", e)
@@ -185,12 +213,16 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPosts() {
+        if (!AppAuth.isInitialized() || AppAuth.getInstance().authStateFlow.value.token == null) {
+            Log.d("PostViewModel", "Not authorized, skipping refresh")
+            return
+        }
+
         _state.value = _state.value?.copy(refreshing = true)
         viewModelScope.launch {
             try {
                 repository.getAllAsync()
                 _state.value = _state.value?.copy(refreshing = false, error = false)
-                updateLastVisiblePostId()
             } catch (e: Exception) {
                 _state.value = _state.value?.copy(refreshing = false, error = true)
                 Log.e("PostViewModel", "Refresh posts error: ${e.message}", e)
@@ -199,6 +231,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun save() {
+        if (!isAuthenticated()) {
+            _state.value = _state.value?.copy(error = true)
+            return
+        }
+
         edited.value?.let { post ->
             _postCreated.value = Unit
             viewModelScope.launch {
@@ -220,6 +257,10 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun edit(post: Post) {
+        if (!isAuthenticated()) {
+            _state.value = _state.value?.copy(error = true)
+            return
+        }
         edited.value = post
     }
 
@@ -232,6 +273,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun likeById(id: Long) {
+        if (!isAuthenticated()) {
+            _state.value = _state.value?.copy(error = true)
+            return
+        }
+
         viewModelScope.launch {
             try {
                 repository.likeById(id)
@@ -243,6 +289,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun removeById(id: Long) {
+        if (!isAuthenticated()) {
+            _state.value = _state.value?.copy(error = true)
+            return
+        }
+
         viewModelScope.launch {
             try {
                 repository.removeById(id)
@@ -254,6 +305,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun shareById(id: Long) {
+        if (!isAuthenticated()) {
+            _state.value = _state.value?.copy(error = true)
+            return
+        }
+
         viewModelScope.launch {
             try {
                 repository.shareById(id)
@@ -264,7 +320,16 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun isAuthenticated(): Boolean {
+        return AppAuth.isInitialized() && AppAuth.getInstance().authStateFlow.value.token != null
+    }
+
     fun syncWithServer() {
+        if (!isAuthenticated()) {
+            Log.d("PostViewModel", "Not authorized, skipping sync")
+            return
+        }
+
         viewModelScope.launch {
             try {
                 repository.syncWithServer()

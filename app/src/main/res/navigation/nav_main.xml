@@ -19,6 +19,14 @@
             android:id="@+id/action_feedFragment_to_photoFragment"
             app:destination="@id/photoFragment" />
 
+        <action
+            android:id="@+id/action_feedFragment_to_loginFragment"
+            app:destination="@id/loginFragment" />
+
+        <action
+            android:id="@+id/action_feedFragment_to_registerFragment"
+            app:destination="@id/registerFragment" />
+
     </fragment>
 
     <fragment
@@ -35,6 +43,35 @@
         <argument
             android:name="url"
             app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="ru.netology.nmedia.fragment.LoginFragment"
+        android:label="LoginFragment"
+        tools:layout="@layout/fragment_login">
+        <action
+            android:id="@+id/action_loginFragment_to_registerFragment"
+            app:destination="@id/registerFragment" />
+        <!-- 👇 ДОБАВЛЯЕМ ДЕЙСТВИЕ ДЛЯ ВОЗВРАТА НА FEED ПОСЛЕ УСПЕШНОГО ВХОДА -->
+        <action
+            android:id="@+id/action_loginFragment_to_feedFragment"
+            app:destination="@id/feedFragment"
+            app:popUpTo="@id/feedFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/registerFragment"
+        android:name="ru.netology.nmedia.fragment.RegisterFragment"
+        android:label="RegisterFragment"
+        tools:layout="@layout/fragment_register">
+        <!-- 👇 ДОБАВЛЯЕМ ДЕЙСТВИЕ ДЛЯ ВОЗВРАТА НА FEED ПОСЛЕ УСПЕШНОЙ РЕГИСТРАЦИИ -->
+        <action
+            android:id="@+id/action_registerFragment_to_feedFragment"
+            app:destination="@id/feedFragment"
+            app:popUpTo="@id/feedFragment"
+            app:popUpToInclusive="true" />
     </fragment>
 
 </navigation>

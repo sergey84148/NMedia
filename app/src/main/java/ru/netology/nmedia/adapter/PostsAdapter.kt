@@ -19,8 +19,7 @@ interface OnInteractionListener {
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
-    fun onOpenPost(post: Post) {}
-    fun onOpenPhoto(url: String) {}  // 👈 ДОБАВЛЕН МЕТОД
+    fun onOpenPhoto(url: String) {}
 }
 
 // Адаптер для отображения постов
@@ -51,6 +50,7 @@ class PostViewHolder(
 
             like.isChecked = post.likedByMe
             like.text = post.likes.toString()
+            //menu.isVisible = post.ownedByMe
 
             ImageLoader.loadAvatar(itemView.context, post.authorAvatar, avatar)
 
@@ -66,8 +66,8 @@ class PostViewHolder(
                 )
 
                 // Отображаем описание, если есть
-                if (!post.attachment!!.description.isNullOrEmpty()) {
-                    attachmentDescription.text = post.attachment!!.description
+                if (!post.attachment.description.isNullOrEmpty()) {
+                    attachmentDescription.text = post.attachment.description
                     attachmentDescription.visibility = View.VISIBLE
                 } else {
                     attachmentDescription.visibility = View.GONE
@@ -75,7 +75,7 @@ class PostViewHolder(
 
                 // 👇 ОБРАБОТЧИК КЛИКА НА ИЗОБРАЖЕНИЕ
                 attachmentImage.setOnClickListener {
-                    val fullUrl = "http://10.0.2.2:9999/media/${post.attachment!!.url}"
+                    val fullUrl = "http://10.0.2.2:9999/media/${post.attachment.url}"
                     onInteractionListener.onOpenPhoto(fullUrl)
                 }
             } else {

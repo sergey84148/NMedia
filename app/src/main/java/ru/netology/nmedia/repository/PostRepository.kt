@@ -10,6 +10,7 @@ import java.io.File
 interface PostRepository {
     // Данные как Flow (только видимые посты)
     val data: Flow<List<Post>>
+    suspend fun getAll(): List<Post>
 
     // Flow для отслеживания количества новых постов (для плашки)
     val newPostsCount: Flow<Int>

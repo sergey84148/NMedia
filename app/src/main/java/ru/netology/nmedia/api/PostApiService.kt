@@ -8,8 +8,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 import ru.netology.nmedia.BuildConfig
-import ru.netology.nmedia.dto.Media
-import ru.netology.nmedia.dto.Post
+import ru.netology.nmedia.auth.AppAuth
+import ru.netology.nmedia.dto.*
 
 const val BASE_URL = "http://10.0.2.2:9999/api/slow/"
 
@@ -21,6 +21,21 @@ private val logging = HttpLoggingInterceptor().apply {
 
 private val okhttp = OkHttpClient.Builder()
     .addInterceptor(logging)
+    .addInterceptor { chain ->
+        try {
+            if (AppAuth.isInitialized()) {
+                AppAuth.getInstance().authStateFlow.value.token?.let { token ->
+                    val newRequest = chain.request().newBuilder()
+                        .addHeader("Authorization", token)
+                        .build()
+                    return@addInterceptor chain.proceed(newRequest)
+                }
+            }
+        } catch (e: IllegalStateException) {
+            // Игнорируем
+        }
+        chain.proceed(chain.request())
+    }
     .build()
 
 private val retrofit = Retrofit.Builder()
@@ -30,6 +45,7 @@ private val retrofit = Retrofit.Builder()
     .build()
 
 interface PostsApiService {
+    // Посты
     @GET("posts")
     suspend fun getAll(): Response<List<Post>>
 
@@ -54,8 +70,26 @@ interface PostsApiService {
     @Multipart
     @POST("media")
     suspend fun upload(@Part media: MultipartBody.Part): Response<Media>
+
     @POST("posts/{id}")
-    suspend fun shareById(id: Long): Post
+    suspend fun shareById(@Path("id") id: Long): Post
+
+    // 👇 ИСПРАВЛЕННЫЕ ЭНДПОИНТЫ АУТЕНТИФИКАЦИИ
+    @FormUrlEncoded
+    @POST("users/authentication")
+    suspend fun login(
+        @Field("login") login: String,
+        @Field("pass") pass: String
+    ): Response<AuthResponse>
+
+    @Multipart
+    @POST("users/registration")
+    suspend fun register(
+        @Part("login") login: okhttp3.RequestBody,
+        @Part("pass") pass: okhttp3.RequestBody,
+        @Part("name") name: okhttp3.RequestBody,
+        @Part file: MultipartBody.Part? = null
+    ): Response<AuthResponse>
 }
 
 object PostsApi {

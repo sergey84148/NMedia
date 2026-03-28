@@ -40,4 +40,8 @@
     <string name="image_picker_error">image_picker_error</string>
     <string name="notification_permission_granted">notification_permission_granted</string>
     <string name="notification_permission_denied">notification_permission_denied</string>
+
+    <string name="sign_in">Sign In</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="sign_out">Sign Out</string>
 </resources>
