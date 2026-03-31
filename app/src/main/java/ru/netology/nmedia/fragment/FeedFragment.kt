@@ -96,16 +96,15 @@ class FeedFragment : Fragment() {
         setupRecyclerViewScrollListener(binding)
 
         binding.swipeRefreshLayout.setOnRefreshListener {
+            // 👇 Сначала сбрасываем индикатор
+            binding.swipeRefreshLayout.isRefreshing = false
+
             if (!isAuthenticated()) {
                 showAuthDialog()
-                binding.swipeRefreshLayout.isRefreshing = false
                 return@setOnRefreshListener
             }
             viewModel.syncWithServer()
-            viewModel.data.observe(viewLifecycleOwner) { feedModel ->
-                adapter.submitList(feedModel.posts)
-                binding.empty.isVisible = feedModel.posts.isEmpty()
-            }
+            // Не нужно повторно устанавливать observer
         }
 
         viewModel.data.observe(viewLifecycleOwner) { feedModel ->

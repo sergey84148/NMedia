@@ -11,7 +11,7 @@ import ru.netology.nmedia.entity.PostEntity
 
 @Database(
     entities = [PostEntity::class],
-    version = 6,  // Увеличьте версию
+    version = 7,  // Увеличьте версию
     exportSchema = false
 )
 @TypeConverters(Converters::class)

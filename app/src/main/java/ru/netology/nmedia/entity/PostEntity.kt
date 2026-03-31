@@ -7,13 +7,12 @@ import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.AttachmentType
 import ru.netology.nmedia.enumeration.SyncState
 
-@Entity(tableName = "PostEntity")
+@Entity(tableName = "posts")
 data class PostEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val serverId: Long? = null,
     val author: String = "",
-    val authorId: Long = 0,  // 👈 ДОБАВЛЯЕМ поле authorId
+    val authorId: Long = 0,
     val authorAvatar: String? = null,
     val content: String = "",
     val published: Long = 0,
@@ -30,9 +29,9 @@ data class PostEntity(
     val attachmentType: AttachmentType? = null
 ) {
     fun toDto(): Post = Post(
-        id = serverId ?: 0L,
+        id = id, // Используем локальный id как основной
         author = author,
-        authorId = authorId,  // 👈 добавляем в DTO
+        authorId = authorId,
         authorAvatar = authorAvatar ?: "",
         content = content,
         published = published,
@@ -51,10 +50,9 @@ data class PostEntity(
 
     companion object {
         fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity = PostEntity(
-            id = 0,
-            serverId = dto.id.takeIf { it != 0L },
+            id = dto.id, // Используем id из DTO (может быть отрицательным для новых постов)
             author = dto.author,
-            authorId = dto.authorId,  // 👈 добавляем
+            authorId = dto.authorId,
             authorAvatar = dto.authorAvatar,
             content = dto.content,
             published = dto.published,
@@ -76,9 +74,9 @@ data class PostEntity(
             syncState: SyncState = SyncState.SYNCED,
             isNew: Boolean = false
         ): PostEntity = existingEntity.copy(
-            serverId = dto.id.takeIf { it != 0L },
+            id = dto.id, // Обновляем id из DTO
             author = dto.author,
-            authorId = dto.authorId,  // 👈 добавляем
+            authorId = dto.authorId,
             authorAvatar = dto.authorAvatar,
             content = dto.content,
             published = dto.published,
