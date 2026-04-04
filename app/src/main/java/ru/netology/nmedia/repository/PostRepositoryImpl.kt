@@ -75,17 +75,21 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
                 PostsApi.service.likeById(entity.id)
             }
 
-            val serverBody = serverResponse.body() ?: updatedDto
-
-            val syncedEntity = updatedEntity.copy(
-                syncState = SyncState.SYNCED,
-                retryCount = 0,
-                likes = serverBody.likes,
-                likedByMe = serverBody.likedByMe
-            )
-            dao.update(syncedEntity)
-
-            serverBody
+            if (serverResponse.isSuccessful) {
+                val serverBody = serverResponse.body() ?: updatedDto
+                val syncedEntity = updatedEntity.copy(
+                    syncState = SyncState.SYNCED,
+                    retryCount = 0,
+                    likes = serverBody.likes,
+                    likedByMe = serverBody.likedByMe
+                )
+                dao.update(syncedEntity)
+                serverBody
+            } else {
+                Log.e("PostRepository", "Like/Dislike failed: ${serverResponse.code()}")
+                _syncState.value = SyncState.FAILED
+                updatedDto
+            }
         } catch (e: Exception) {
             Log.e("PostRepository", "Like/Dislike error", e)
             _syncState.value = SyncState.FAILED
@@ -106,13 +110,21 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
 
         return if (entity.id > 0) {
             try {
-                val serverPost = PostsApi.service.shareById(entity.id)
-                val syncedEntity = updatedEntity.copy(
-                    syncState = SyncState.SYNCED,
-                    retryCount = 0
-                )
-                dao.update(syncedEntity)
-                serverPost
+                val response = PostsApi.service.shareById(entity.id)
+                if (response.isSuccessful) {
+                    val serverPost = response.body() ?: updatedEntity.toDto()
+                    val syncedEntity = updatedEntity.copy(
+                        syncState = SyncState.SYNCED,
+                        retryCount = 0,
+                        shares = serverPost.shares
+                    )
+                    dao.update(syncedEntity)
+                    serverPost
+                } else {
+                    Log.e("PostRepository", "Share failed: ${response.code()}")
+                    _syncState.value = SyncState.FAILED
+                    updatedEntity.toDto()
+                }
             } catch (e: Exception) {
                 Log.e("PostRepository", "Share error", e)
                 _syncState.value = SyncState.FAILED

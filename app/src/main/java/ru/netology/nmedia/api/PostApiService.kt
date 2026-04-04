@@ -22,19 +22,29 @@ private val logging = HttpLoggingInterceptor().apply {
 private val okhttp = OkHttpClient.Builder()
     .addInterceptor(logging)
     .addInterceptor { chain ->
+        val originalRequest = chain.request()
+
         try {
             if (AppAuth.isInitialized()) {
-                AppAuth.getInstance().authStateFlow.value.token?.let { token ->
-                    val newRequest = chain.request().newBuilder()
+                val token = AppAuth.getInstance().getToken()
+                println("DEBUG: Token = $token")
+                if (!token.isNullOrEmpty()) {
+                    val newRequest = originalRequest.newBuilder()
                         .addHeader("Authorization", token)
                         .build()
+                    println("DEBUG: Added Authorization header")
                     return@addInterceptor chain.proceed(newRequest)
+                } else {
+                    println("DEBUG: Token is null or empty")
                 }
+            } else {
+                println("DEBUG: AppAuth not initialized")
             }
-        } catch (e: IllegalStateException) {
-            // Игнорируем
+        } catch (e: Exception) {
+            println("DEBUG: Error adding token: ${e.message}")
         }
-        chain.proceed(chain.request())
+
+        chain.proceed(originalRequest)
     }
     .build()
 
@@ -67,6 +77,9 @@ interface PostsApiService {
     @DELETE("posts/{id}/likes")
     suspend fun dislikeById(@Path("id") id: Long): Response<Post>
 
+    @POST("posts/{id}/shares")
+    suspend fun shareById(@Path("id") id: Long): Response<Post>
+
     @Multipart
     @POST("media")
     suspend fun upload(@Part media: MultipartBody.Part): Response<Media>
@@ -74,11 +87,6 @@ interface PostsApiService {
     @POST("users/push-tokens")
     suspend fun sendPushToken(@Body pushToken: PushToken): Response<Unit>
 
-
-    @POST("posts/{id}")
-    suspend fun shareById(@Path("id") id: Long): Post
-
-    // 👇 ИСПРАВЛЕННЫЕ ЭНДПОИНТЫ АУТЕНТИФИКАЦИИ
     @FormUrlEncoded
     @POST("users/authentication")
     suspend fun login(
