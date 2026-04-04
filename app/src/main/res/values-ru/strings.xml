@@ -36,10 +36,14 @@
     <string name="new_posts_banner_text">Новых постов: %d</string>
     <string name="new_post_banner_text">Новый пост</string>
 
-    <string name="notification_permission_denied">разрешение на уведомления отклонено</string>
+    <string name="notification_permission_denied">Разрешение на уведомления отклонено</string>
+    <string name="notification_permission_granted">Разрешение на уведомления предоставлено</string>
     <string name="sign_in">Вход</string>
     <string name="sign_up">Регистрация</string>
     <string name="sign_out">Выход</string>
     <string name="image_picker_error">Ошибка выбора изображения</string>
-    <string name="notification_permission_granted">разрешение на уведомления предоставлено</string>
+
+    <!-- Дополнительные строки для push-уведомлений -->
+    <string name="push_notification_title">Новое уведомление</string>
+    <string name="push_notification_text">У вас новое уведомление</string>
 </resources>

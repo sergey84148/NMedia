@@ -71,6 +71,10 @@ interface PostsApiService {
     @POST("media")
     suspend fun upload(@Part media: MultipartBody.Part): Response<Media>
 
+    @POST("users/push-tokens")
+    suspend fun sendPushToken(@Body pushToken: PushToken): Response<Unit>
+
+
     @POST("posts/{id}")
     suspend fun shareById(@Path("id") id: Long): Post
 

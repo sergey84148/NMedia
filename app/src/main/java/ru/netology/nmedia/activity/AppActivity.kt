@@ -16,6 +16,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.findNavController
 import androidx.navigation.fragment.NavHostFragment
@@ -24,6 +25,8 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.material.snackbar.BaseTransientBottomBar.LENGTH_INDEFINITE
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import ru.netology.nmedia.R
 import ru.netology.nmedia.auth.AppAuth
 import ru.netology.nmedia.databinding.ActivityAppBinding
@@ -126,7 +129,18 @@ class AppActivity : AppCompatActivity() {
         val permission = Manifest.permission.POST_NOTIFICATIONS
         if (ActivityCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) return
 
-        requestPermissions(arrayOf(permission), 1)
+        // Запрашиваем разрешение с объяснением
+        if (shouldShowRequestPermissionRationale(permission)) {
+            Snackbar.make(
+                findViewById(android.R.id.content),
+                "Для получения уведомлений о новых постах необходимо разрешение",
+                LENGTH_INDEFINITE
+            ).setAction("Разрешить") {
+                requestPermissions(arrayOf(permission), 1)
+            }.show()
+        } else {
+            requestPermissions(arrayOf(permission), 1)
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -137,8 +151,22 @@ class AppActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, R.string.notification_permission_granted, Toast.LENGTH_SHORT).show()
+            // После получения разрешения отправляем push token
+            sendPushToken()
         } else {
             Toast.makeText(this, R.string.notification_permission_denied, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun sendPushToken() {
+        lifecycleScope.launch {
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                AppAuth.getInstance().savePushToken(token)
+                AppAuth.getInstance().sendPushToken(token)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -147,8 +175,22 @@ class AppActivity : AppCompatActivity() {
         val code = googleApiAvailability.isGooglePlayServicesAvailable(this)
 
         if (code == ConnectionResult.SUCCESS) {
-            FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-                println("FCM Token: $token")
+            lifecycleScope.launch {
+                try {
+                    val token = FirebaseMessaging.getInstance().token.await()
+                    println("FCM Token: $token")
+                    // Сохраняем и отправляем токен
+                    AppAuth.getInstance().savePushToken(token)
+                    if (ActivityCompat.checkSelfPermission(
+                            this@AppActivity,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        AppAuth.getInstance().sendPushToken(token)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
             return
         }
