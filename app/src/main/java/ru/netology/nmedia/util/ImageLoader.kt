@@ -7,7 +7,6 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import android.util.Log
 import android.view.View
 import ru.netology.nmedia.R
-import ru.netology.nmedia.api.BASE_URL
 import ru.netology.nmedia.dto.Attachment
 
 

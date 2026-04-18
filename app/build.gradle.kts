@@ -1,4 +1,3 @@
-import org.gradle.kotlin.dsl.implementation
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -6,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.dagger.hilt.android)
 }
 
 android {
@@ -73,8 +73,7 @@ dependencies {
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.imagepicker)
     implementation(libs.ucrop)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
     coreLibraryDesugaring(libs.desugaring)
-    implementation (libs.glide.v4160)
 }
-
-

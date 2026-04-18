@@ -1,39 +1,59 @@
 package ru.netology.nmedia.auth
 
 import android.content.Context
-import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.Firebase
+import com.google.firebase.messaging.messaging
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import ru.netology.nmedia.api.PostsApi
+import ru.netology.nmedia.api.ApiService
 import ru.netology.nmedia.dto.PushToken
-import kotlin.coroutines.EmptyCoroutineContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class AppAuth private constructor(context: Context) {
+@Singleton
+class AppAuth @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
     private val prefs = context.getSharedPreferences("auth", Context.MODE_PRIVATE)
     private val idKey = "id"
     private val tokenKey = "token"
     private val avatarKey = "avatar"
     private val pushTokenKey = "push_token"
 
-    private val _authStateFlow = MutableStateFlow(AuthState())
-    val authStateFlow: StateFlow<AuthState> = _authStateFlow
+    private val _authStateFlow: MutableStateFlow<AuthState>
 
     init {
         val id = prefs.getLong(idKey, 0)
         val token = prefs.getString(tokenKey, null)
         val avatar = prefs.getString(avatarKey, null)
 
-        if (id != 0L && !token.isNullOrEmpty()) {
-            _authStateFlow.value = AuthState(id, token, avatar)
+        if (id == 0L || token.isNullOrEmpty()) {
+            _authStateFlow = MutableStateFlow(AuthState())
+            with(prefs.edit()) {
+                clear()
+                apply()
+            }
+        } else {
+            _authStateFlow = MutableStateFlow(AuthState(id, token, avatar))
         }
+    }
 
-        // Отправляем push токен при инициализации
-        CoroutineScope(EmptyCoroutineContext).launch {
-            getPushToken()?.let { sendPushToken(it) }
-        }
+    val authStateFlow: StateFlow<AuthState> = _authStateFlow.asStateFlow()
+
+    @InstallIn(SingletonComponent::class)
+    @EntryPoint
+    interface AppAuthEntryPoint {
+        fun apiService(): ApiService
     }
 
     @Synchronized
@@ -45,7 +65,6 @@ class AppAuth private constructor(context: Context) {
             if (avatar != null) putString(avatarKey, avatar)
             apply()
         }
-
         sendPushToken()
     }
 
@@ -54,66 +73,52 @@ class AppAuth private constructor(context: Context) {
         _authStateFlow.value = AuthState()
         with(prefs.edit()) {
             clear()
-            commit()
+            apply()
         }
-
         sendPushToken()
     }
 
-    fun sendPushToken(token: String? = null) {
-        CoroutineScope(EmptyCoroutineContext).launch {
-            runCatching {
-                val pushToken = token ?: getPushToken() ?: FirebaseMessaging.getInstance().token.await()
-                savePushToken(pushToken)
-                PostsApi.service.sendPushToken(PushToken(pushToken))
-            }
-                .onFailure { it.printStackTrace() }
-        }
-    }
-
-    // Получить ID текущего пользователя
     fun getUserId(): Long? {
         val userId = _authStateFlow.value.id
         return if (userId != 0L) userId else null
     }
 
-    // Получить токен авторизации
     fun getToken(): String? {
         return _authStateFlow.value.token
     }
 
-    // Получить сохраненный push токен (suspend версия)
-    suspend fun getPushToken(): String? {
-        return prefs.getString(pushTokenKey, null)
+    fun getAvatar(): String? {
+        return _authStateFlow.value.avatar
     }
 
-    // Сохранить push токен
-    suspend fun savePushToken(token: String) {
+    fun sendPushToken(token: String? = null) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val pushToken = token ?: getPushToken() ?: Firebase.messaging.token.await()
+                savePushToken(pushToken)
+                val apiService = getApiService(context)
+                apiService.save(PushToken(pushToken))
+                println("Push token sent to server: $pushToken")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun savePushToken(token: String) {
         prefs.edit().putString(pushTokenKey, token).apply()
     }
 
-    // Проверить авторизован ли пользователь
-    fun isAuthenticated(): Boolean {
-        return _authStateFlow.value.id != 0L && !_authStateFlow.value.token.isNullOrEmpty()
+    fun getPushToken(): String? {
+        return prefs.getString(pushTokenKey, null)
     }
 
-    companion object {
-        @Volatile
-        private var instance: AppAuth? = null
-
-        fun getInstance(): AppAuth = synchronized(this) {
-            instance ?: throw IllegalStateException(
-                "AppAuth is not initialized, you must call AppAuth.initializeApp(Context context) first."
-            )
-        }
-
-        fun initializeApp(context: Context): AppAuth = synchronized(this) {
-            instance ?: buildAuth(context).also { instance = it }
-        }
-
-        fun isInitialized(): Boolean = instance != null
-
-        private fun buildAuth(context: Context): AppAuth = AppAuth(context)
+    private fun getApiService(context: Context): ApiService {
+        val hiltEntryPoint = EntryPointAccessors.fromApplication(
+            context,
+            AppAuthEntryPoint::class.java
+        )
+        return hiltEntryPoint.apiService()
     }
 }
 

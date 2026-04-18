@@ -3,13 +3,14 @@ package ru.netology.nmedia.viewmodel
 import android.app.Application
 import android.net.Uri
 import android.util.Log
-import androidx.lifecycle.*
-import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.auth.AppAuth
-import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.dto.MediaUpload
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
@@ -17,35 +18,33 @@ import ru.netology.nmedia.model.FeedModel
 import ru.netology.nmedia.model.FeedModelState
 import ru.netology.nmedia.model.PhotoModel
 import ru.netology.nmedia.repository.PostRepository
-import ru.netology.nmedia.repository.PostRepositoryImpl
 import ru.netology.nmedia.util.SingleLiveEvent
 import ru.netology.nmedia.utils.RetryPolicy
 import java.io.File
+import javax.inject.Inject
 
-class PostViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: PostRepository = PostRepositoryImpl(
-        AppDb.getInstance(application).postDao()
-    )
+@HiltViewModel
+class PostViewModel @Inject constructor(
+    private val repository: PostRepository,
+    private val appAuth: AppAuth,
+    private val application: Application
+) : ViewModel() {
 
     private val _state = MutableLiveData(FeedModelState())
-    val state: LiveData<FeedModelState>
-        get() = _state
+    val state: LiveData<FeedModelState> = _state
 
     private val _data = MutableLiveData<FeedModel>()
     val data: LiveData<FeedModel> = _data
 
     val edited = MutableLiveData(emptyPost)
     private val _photo = MutableLiveData<PhotoModel?>(null)
-    val photo: LiveData<PhotoModel?>
-        get() = _photo
+    val photo: LiveData<PhotoModel?> = _photo
 
     private val _postCreated = SingleLiveEvent<Unit>()
-    val postCreated: LiveData<Unit>
-        get() = _postCreated
+    val postCreated: LiveData<Unit> = _postCreated
 
     private val _syncState = MutableLiveData<SyncState>()
-    val syncState: LiveData<SyncState>
-        get() = _syncState
+    val syncState: LiveData<SyncState> = _syncState
 
     private val _isNetworkAvailable = MutableLiveData(true)
     val isNetworkAvailable: LiveData<Boolean> = _isNetworkAvailable
@@ -61,29 +60,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     private var lastVisiblePostId = 0L
 
-    companion object {
-        val emptyPost = Post(
-            id = 0L,
-            author = "",
-            authorId = 0,
-            authorAvatar = "",
-            content = "",
-            published = 0,
-            likedByMe = false,
-            likes = 0,
-            shares = 0,
-            video = null,
-            attachment = null
-        )
-    }
-
     init {
         viewModelScope.launch {
-            while (!AppAuth.isInitialized()) {
-                delay(100)
-            }
+            delay(100)
 
-            AppAuth.getInstance().authStateFlow.collect { authState ->
+            appAuth.authStateFlow.collect { authState ->
                 if (authState.token != null && authState.id != 0L) {
                     loadPosts()
                 } else {
@@ -94,7 +75,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             repository.data.collect { posts ->
-                val currentAuth = AppAuth.getInstance().authStateFlow.value
+                val currentAuth = appAuth.authStateFlow.value
                 val feedModel = FeedModel(
                     posts = posts.map { it.copy(ownedByMe = it.authorId == currentAuth.id) }
                 )
@@ -122,8 +103,9 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        // Исправлено: передаем Application context вместо LifecycleOwner
         viewModelScope.launch {
-            RetryPolicy.observeNetwork(getApplication()).collect { isConnected ->
+            RetryPolicy.observeNetwork(application).collect { isConnected ->
                 _isNetworkAvailable.postValue(isConnected)
 
                 if (!isConnected) {
@@ -173,7 +155,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadPosts() {
-        if (!AppAuth.isInitialized() || AppAuth.getInstance().authStateFlow.value.token == null) {
+        if (appAuth.authStateFlow.value.token == null) {
             Log.d("PostViewModel", "Not authorized, skipping load")
             return
         }
@@ -212,8 +194,9 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @Suppress("unused")
     fun refreshPosts() {
-        if (!AppAuth.isInitialized() || AppAuth.getInstance().authStateFlow.value.token == null) {
+        if (appAuth.authStateFlow.value.token == null) {
             Log.d("PostViewModel", "Not authorized, skipping refresh")
             return
         }
@@ -304,6 +287,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @Suppress("unused")
     fun shareById(id: Long) {
         if (!isAuthenticated()) {
             _state.value = _state.value?.copy(error = true)
@@ -321,7 +305,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun isAuthenticated(): Boolean {
-        return AppAuth.isInitialized() && AppAuth.getInstance().authStateFlow.value.token != null
+        return appAuth.authStateFlow.value.token != null
     }
 
     fun syncWithServer() {
@@ -347,6 +331,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @Suppress("unused")
     fun clearError() {
         _state.value = _state.value?.copy(error = false, syncError = false)
     }
@@ -355,6 +340,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         _photo.value = PhotoModel(uri, file)
     }
 
+    @Suppress("unused")
     fun removePhoto() {
         _photo.value = null
     }
@@ -362,5 +348,21 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     fun clearEditing() {
         edited.value = emptyPost
         _photo.value = null
+    }
+
+    companion object {
+        val emptyPost = Post(
+            id = 0L,
+            author = "",
+            authorId = 0,
+            authorAvatar = "",
+            content = "",
+            published = 0,
+            likedByMe = false,
+            likes = 0,
+            shares = 0,
+            video = null,
+            attachment = null
+        )
     }
 }

@@ -6,19 +6,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
-import ru.netology.nmedia.api.PostsApi
+import ru.netology.nmedia.api.ApiService
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dto.*
-import ru.netology.nmedia.entity.PostEntity
 import ru.netology.nmedia.enumeration.AttachmentType
 import ru.netology.nmedia.enumeration.SyncState
 import ru.netology.nmedia.error.ApiError
 import ru.netology.nmedia.error.AppError
 import ru.netology.nmedia.error.NetworkError
+import ru.netology.nmedia.entity.PostEntity
 import java.io.File
 import java.io.IOException
 
-class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
+class PostRepositoryImpl(
+    private val dao: PostDao,
+    private val apiService: ApiService,
+) : PostRepository {
     private val _syncState = MutableStateFlow(SyncState.DONE)
 
     override val data: Flow<List<Post>> = dao.getAll()
@@ -70,9 +73,9 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
 
         return try {
             val serverResponse = if (postDto.likedByMe) {
-                PostsApi.service.dislikeById(entity.id)
+                apiService.dislikeById(entity.id)
             } else {
-                PostsApi.service.likeById(entity.id)
+                apiService.likeById(entity.id)
             }
 
             if (serverResponse.isSuccessful) {
@@ -110,7 +113,7 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
 
         return if (entity.id > 0) {
             try {
-                val response = PostsApi.service.shareById(entity.id)
+                val response = apiService.shareById(entity.id)
                 if (response.isSuccessful) {
                     val serverPost = response.body() ?: updatedEntity.toDto()
                     val syncedEntity = updatedEntity.copy(
@@ -136,7 +139,6 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
     }
 
     override suspend fun save(post: Post): Post {
-        // Для новых постов используем отрицательный ID
         val entity = if (post.id <= 0) {
             PostEntity.fromDto(
                 dto = post.copy(id = -System.currentTimeMillis()),
@@ -164,24 +166,21 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
         }
 
         return try {
-            // Отправляем на сервер с id = 0 для новых постов
             val postForServer = if (post.id <= 0) {
                 post.copy(id = 0)
             } else {
                 post
             }
 
-            val response = PostsApi.service.save(postForServer)
+            val response = apiService.save(postForServer)
             if (!response.isSuccessful) {
                 throw ApiError(response.code(), response.message())
             }
 
             val serverPost = response.body() ?: throw ApiError(response.code(), "Empty body")
 
-            // Удаляем временный пост
             dao.delete(entity)
 
-            // Проверяем, не появился ли пост при параллельной синхронизации
             val existing = dao.getById(serverPost.id)
             if (existing == null) {
                 dao.insert(PostEntity.fromDto(serverPost, SyncState.SYNCED))
@@ -226,14 +225,13 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
     override suspend fun removeById(id: Long) {
         val entity = dao.getById(id) ?: return
 
-        // Если id отрицательный (несинхронизированный пост), просто удаляем
         if (entity.id <= 0) {
             dao.delete(entity)
             return
         }
 
         try {
-            val response = PostsApi.service.removeById(entity.id)
+            val response = apiService.removeById(entity.id)
             if (response.isSuccessful) {
                 dao.delete(entity)
             } else {
@@ -273,16 +271,13 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             try {
                 when (post.syncState) {
                     SyncState.PENDING -> {
-                        // Для несинхронизированных постов id отрицательный
-                        val postToSend = post.toDto().copy(id = 0) // id 0 для создания на сервере
-                        val response = PostsApi.service.save(postToSend)
+                        val postToSend = post.toDto().copy(id = 0)
+                        val response = apiService.save(postToSend)
                         if (response.isSuccessful) {
                             val serverPost = response.body()
                             if (serverPost != null) {
-                                // Удаляем временный пост с отрицательным id
                                 dao.delete(post)
 
-                                // Вставляем синхронизированный пост с положительным id
                                 val existing = dao.getById(serverPost.id)
                                 if (existing == null) {
                                     dao.insert(PostEntity.fromDto(serverPost, SyncState.SYNCED))
@@ -305,9 +300,8 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
                         }
                     }
                     SyncState.PENDING_DELETE -> {
-                        // Для удаления используем положительный id
                         if (post.id > 0) {
-                            val response = PostsApi.service.removeById(post.id)
+                            val response = apiService.removeById(post.id)
                             if (response.isSuccessful) {
                                 dao.delete(post)
                             } else {
@@ -315,7 +309,6 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
                                 Log.e("PostRepository", "Failed to delete post ${post.id}: ${response.code()}")
                             }
                         } else {
-                            // Если id отрицательный, просто удаляем локально
                             dao.delete(post)
                         }
                     }
@@ -331,11 +324,10 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
 
     override suspend fun checkForNewPosts(afterId: Long): Int {
         return try {
-            val response = PostsApi.service.getNewer(afterId)
+            val response = apiService.getNewer(afterId)
             if (response.isSuccessful) {
                 val newPosts = response.body() ?: return 0
 
-                // Получаем существующие id (только положительные, синхронизированные)
                 val existingIds = dao.getAllSync()
                     .filter { it.id > 0 && it.syncState == SyncState.SYNCED }
                     .map { it.id }
@@ -364,7 +356,7 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             val mediaPart = MultipartBody.Part.createFormData(
                 "file", file.name, file.asRequestBody()
             )
-            val response = PostsApi.service.upload(mediaPart)
+            val response = apiService.upload(mediaPart)
             if (!response.isSuccessful) {
                 throw ApiError(response.code(), response.message())
             }
@@ -378,16 +370,14 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
 
     override suspend fun getAllAsync() {
         try {
-            val response = PostsApi.service.getAll()
+            val response = apiService.getAll()
             if (!response.isSuccessful) {
                 throw ApiError(response.code(), response.message())
             }
             val serverPosts = response.body() ?: throw ApiError(response.code(), response.message())
 
-            // Получаем все локальные посты
             val localPosts = dao.getAllSync()
 
-            // Для синхронизированных постов id положительный
             val syncedLocalPosts = localPosts
                 .filter { it.id > 0 && it.syncState == SyncState.SYNCED }
                 .associateBy { it.id }
@@ -395,17 +385,14 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             val postsToUpsert = mutableListOf<PostEntity>()
             val serverIds = serverPosts.map { it.id }.toSet()
 
-            // Обрабатываем посты с сервера
             serverPosts.forEach { serverPost ->
                 val existingLocal = syncedLocalPosts[serverPost.id]
 
                 if (existingLocal == null) {
-                    // Новый пост с сервера
                     postsToUpsert.add(
                         PostEntity.fromDto(serverPost, SyncState.SYNCED, isNew = true)
                     )
                 } else {
-                    // Обновляем существующий пост, сохраняя локальные данные
                     postsToUpsert.add(
                         PostEntity.updateFromDto(
                             existingEntity = existingLocal,
@@ -422,11 +409,9 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
                 }
             }
 
-            // Удаляем локальные посты, которых нет на сервере (только синхронизированные)
             val postsToDelete = syncedLocalPosts.values
                 .filter { !serverIds.contains(it.id) }
 
-            // Обновляем или вставляем посты
             if (postsToUpsert.isNotEmpty()) {
                 postsToUpsert.forEach { post ->
                     val existing = dao.getById(post.id)
@@ -438,7 +423,6 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
                 }
             }
 
-            // Удаляем посты
             if (postsToDelete.isNotEmpty()) {
                 postsToDelete.forEach { dao.delete(it) }
             }

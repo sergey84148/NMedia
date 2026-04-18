@@ -12,19 +12,25 @@ import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.R
 import ru.netology.nmedia.auth.AppAuth
+import javax.inject.Inject
 import kotlin.random.Random
 
+@AndroidEntryPoint
 class FCMService : FirebaseMessagingService() {
 
     companion object {
         const val CHANNEL_ID = "remote"
         private const val TAG = "FCMService"
     }
+
+    @Inject
+    lateinit var appAuth: AppAuth
 
     private val gson = Gson()
 
@@ -54,7 +60,6 @@ class FCMService : FirebaseMessagingService() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Получаем JSON-строку из поля "content"
                 val contentJson = message.data["content"]
                 if (contentJson.isNullOrBlank()) {
                     Log.d(TAG, "No content in message")
@@ -63,24 +68,20 @@ class FCMService : FirebaseMessagingService() {
 
                 Log.d(TAG, "Content JSON: $contentJson")
 
-                // Парсим JSON в объект PushMessage
                 val pushMessage = gson.fromJson(contentJson, PushMessage::class.java)
                 val recipientId = pushMessage.recipientId
                 val content = pushMessage.content
 
-                val currentUserId = AppAuth.getInstance().getUserId()
+                val currentUserId = appAuth.getUserId()
 
                 Log.d(TAG, "recipientId: $recipientId, currentUserId: $currentUserId")
                 Log.d(TAG, "content: $content")
 
-                // Логика проверки recipientId (теперь проверяем recipientId, а не recipientIdStr)
                 when {
-                    // Массовая рассылка (recipientId = null)
                     recipientId == null -> {
                         Log.d(TAG, "Mass notification - showing")
                         showNotification(content)
                     }
-                    // Анонимная аутентификация (recipientId = 0)
                     recipientId == 0L && currentUserId == null -> {
                         Log.d(TAG, "Anonymous notification - showing")
                         showNotification(content)
@@ -89,17 +90,14 @@ class FCMService : FirebaseMessagingService() {
                         Log.d(TAG, "Server thinks we're anonymous but we're authenticated - resending token")
                         resendPushToken()
                     }
-                    // recipientId совпадает с текущим пользователем
                     recipientId != null && currentUserId != null && recipientId == currentUserId -> {
                         Log.d(TAG, "Personal notification for current user - showing")
                         showNotification(content)
                     }
-                    // recipientId не совпадает с текущим пользователем
                     recipientId != null && currentUserId != null && recipientId != currentUserId -> {
                         Log.d(TAG, "Recipient mismatch - resending token")
                         resendPushToken()
                     }
-                    // recipientId есть, но пользователь не авторизован
                     recipientId != null && currentUserId == null -> {
                         Log.d(TAG, "Recipient exists but user not authenticated - resending token")
                         resendPushToken()
@@ -117,9 +115,9 @@ class FCMService : FirebaseMessagingService() {
 
     private suspend fun resendPushToken() {
         try {
-            val token = AppAuth.getInstance().getPushToken()
+            val token = appAuth.getPushToken()
             if (token != null) {
-                AppAuth.getInstance().sendPushToken(token)
+                appAuth.sendPushToken(token)
                 Log.d(TAG, "Push token resent successfully")
             } else {
                 Log.d(TAG, "No push token to resend")
@@ -134,8 +132,8 @@ class FCMService : FirebaseMessagingService() {
         Log.d(TAG, "New token generated: $token")
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                AppAuth.getInstance().savePushToken(token)
-                AppAuth.getInstance().sendPushToken(token)
+                appAuth.savePushToken(token)
+                appAuth.sendPushToken(token)
                 Log.d(TAG, "New token saved and sent to server")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save/send new token", e)
@@ -171,7 +169,6 @@ class FCMService : FirebaseMessagingService() {
     }
 }
 
-// Класс для парсинга входящего JSON
 data class PushMessage(
     val recipientId: Long? = null,
     val content: String = ""

@@ -18,23 +18,33 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
-import androidx.navigation.findNavController
 import androidx.navigation.fragment.NavHostFragment
-import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.material.snackbar.BaseTransientBottomBar.LENGTH_INDEFINITE
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.messaging.FirebaseMessaging
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import ru.netology.nmedia.R
 import ru.netology.nmedia.auth.AppAuth
 import ru.netology.nmedia.databinding.ActivityAppBinding
 import ru.netology.nmedia.viewmodel.AuthViewModel
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class AppActivity : AppCompatActivity() {
     private val authViewModel: AuthViewModel by viewModels()
     private lateinit var navController: NavController
+
+    @Inject
+    lateinit var firebaseMessaging: FirebaseMessaging
+
+    @Inject
+    lateinit var googleApiAvailability: GoogleApiAvailability
+
+    @Inject
+    lateinit var appAuth: AppAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,11 +53,9 @@ class AppActivity : AppCompatActivity() {
         val binding = ActivityAppBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Настройка навигации
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.fragment_container) as NavHostFragment
         navController = navHostFragment.navController
 
-        // Обработка системных вставок (insets)
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -59,7 +67,6 @@ class AppActivity : AppCompatActivity() {
         addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
                 menuInflater.inflate(R.menu.menu_main, menu)
-                // 👇 Используем authViewModel для определения состояния
                 menu.let {
                     it.setGroupVisible(R.id.unauthenticated, !authViewModel.authenticated.value!!)
                     it.setGroupVisible(R.id.authenticated, authViewModel.authenticated.value!!)
@@ -91,12 +98,10 @@ class AppActivity : AppCompatActivity() {
             }
         })
 
-        // 👇 Наблюдаем за изменением состояния авторизации для обновления меню
         authViewModel.authenticated.observe(this) {
             invalidateOptionsMenu()
         }
 
-        // Обработка интента
         intent?.let {
             if (it.action != Intent.ACTION_SEND) {
                 return@let
@@ -129,7 +134,6 @@ class AppActivity : AppCompatActivity() {
         val permission = Manifest.permission.POST_NOTIFICATIONS
         if (ActivityCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) return
 
-        // Запрашиваем разрешение с объяснением
         if (shouldShowRequestPermissionRationale(permission)) {
             Snackbar.make(
                 findViewById(android.R.id.content),
@@ -151,7 +155,6 @@ class AppActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, R.string.notification_permission_granted, Toast.LENGTH_SHORT).show()
-            // После получения разрешения отправляем push token
             sendPushToken()
         } else {
             Toast.makeText(this, R.string.notification_permission_denied, Toast.LENGTH_SHORT).show()
@@ -161,9 +164,10 @@ class AppActivity : AppCompatActivity() {
     private fun sendPushToken() {
         lifecycleScope.launch {
             try {
-                val token = FirebaseMessaging.getInstance().token.await()
-                AppAuth.getInstance().savePushToken(token)
-                AppAuth.getInstance().sendPushToken(token)
+                val token = firebaseMessaging.token.await()
+                appAuth.savePushToken(token)
+                appAuth.sendPushToken(token)
+                println("FCM Token: $token")
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -171,27 +175,10 @@ class AppActivity : AppCompatActivity() {
     }
 
     private fun checkGoogleApiAvailability() {
-        val googleApiAvailability = GoogleApiAvailability.getInstance()
         val code = googleApiAvailability.isGooglePlayServicesAvailable(this)
 
-        if (code == ConnectionResult.SUCCESS) {
-            lifecycleScope.launch {
-                try {
-                    val token = FirebaseMessaging.getInstance().token.await()
-                    println("FCM Token: $token")
-                    // Сохраняем и отправляем токен
-                    AppAuth.getInstance().savePushToken(token)
-                    if (ActivityCompat.checkSelfPermission(
-                            this@AppActivity,
-                            Manifest.permission.POST_NOTIFICATIONS
-                        ) == PackageManager.PERMISSION_GRANTED
-                    ) {
-                        AppAuth.getInstance().sendPushToken(token)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
+        if (code == com.google.android.gms.common.ConnectionResult.SUCCESS) {
+            sendPushToken()
             return
         }
 
