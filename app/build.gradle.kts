@@ -77,4 +77,8 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.paging.runtime.ktx)
     coreLibraryDesugaring(libs.desugaring)
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }
