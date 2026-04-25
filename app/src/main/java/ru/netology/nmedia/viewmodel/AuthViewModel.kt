@@ -36,12 +36,18 @@ class AuthViewModel @Inject constructor(
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
 
+    // LiveData для уведомления о смене авторизации
+    private val _authStateChanged = MutableLiveData(false)
+    val authStateChanged: LiveData<Boolean> = _authStateChanged
+
     init {
         viewModelScope.launch {
             appAuth.authStateFlow.collect { authState ->
                 val isAuth = authState.token != null && authState.id != 0L
                 _authenticated.postValue(isAuth)
                 _data.postValue(AuthData(authState.id, authState.token))
+                // Уведомляем об изменении состояния авторизации
+                _authStateChanged.postValue(true)
                 Log.d("AuthViewModel", "Auth state changed: isAuth=$isAuth, userId=${authState.id}")
             }
         }

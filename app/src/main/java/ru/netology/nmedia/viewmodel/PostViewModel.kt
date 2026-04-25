@@ -7,16 +7,21 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.auth.AppAuth
 import ru.netology.nmedia.dto.MediaUpload
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
-import ru.netology.nmedia.model.FeedModel
 import ru.netology.nmedia.model.FeedModelState
 import ru.netology.nmedia.model.PhotoModel
+import ru.netology.nmedia.repository.PostPagingSource
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.util.SingleLiveEvent
 import ru.netology.nmedia.utils.RetryPolicy
@@ -32,9 +37,6 @@ class PostViewModel @Inject constructor(
 
     private val _state = MutableLiveData(FeedModelState())
     val state: LiveData<FeedModelState> = _state
-
-    private val _data = MutableLiveData<FeedModel>()
-    val data: LiveData<FeedModel> = _data
 
     val edited = MutableLiveData(emptyPost)
     private val _photo = MutableLiveData<PhotoModel?>(null)
@@ -60,27 +62,27 @@ class PostViewModel @Inject constructor(
 
     private var lastVisiblePostId = 0L
 
+    // PagingData поток - создается с фабрикой, которая всегда создает новый PagingSource
+    val pagingDataFlow: Flow<PagingData<Post>> = Pager(
+        config = PagingConfig(pageSize = 10, enablePlaceholders = false),
+        pagingSourceFactory = { PostPagingSource(repository.apiService) }
+    ).flow.cachedIn(viewModelScope)
+
+    fun refreshPagingData() {
+
+    }
+
     init {
         viewModelScope.launch {
             delay(100)
 
             appAuth.authStateFlow.collect { authState ->
-                if (authState.token != null && authState.id != 0L) {
+                val isAuth = authState.token != null && authState.id != 0L
+                // При изменении авторизации - pagingDataFlow пересоздастся автоматически
+                // через cachedIn, но нужно уведомить Fragment
+                if (isAuth) {
                     loadPosts()
-                } else {
-                    _data.postValue(FeedModel(emptyList()))
                 }
-            }
-        }
-
-        viewModelScope.launch {
-            repository.data.collect { posts ->
-                val currentAuth = appAuth.authStateFlow.value
-                val feedModel = FeedModel(
-                    posts = posts.map { it.copy(ownedByMe = it.authorId == currentAuth.id) }
-                )
-                _data.postValue(feedModel)
-                updateLastVisiblePostId()
             }
         }
 
@@ -103,7 +105,6 @@ class PostViewModel @Inject constructor(
             }
         }
 
-        // Исправлено: передаем Application context вместо LifecycleOwner
         viewModelScope.launch {
             RetryPolicy.observeNetwork(application).collect { isConnected ->
                 _isNetworkAvailable.postValue(isConnected)
@@ -118,24 +119,15 @@ class PostViewModel @Inject constructor(
                 }
             }
         }
-
-        viewModelScope.launch {
-            delay(1000)
-            updateLastVisiblePostId()
-        }
     }
 
     private suspend fun getPendingPostsCount(): Int {
         return repository.getPendingPostsCount()
     }
 
-    fun updateLastVisiblePostId() {
-        viewModelScope.launch {
-            _data.value?.posts?.firstOrNull()?.let { firstPost ->
-                lastVisiblePostId = firstPost.id
-                Log.d("PostViewModel", "Last visible post ID set to: $lastVisiblePostId")
-            }
-        }
+    fun updateLastVisiblePostId(postId: Long) {
+        lastVisiblePostId = postId
+        Log.d("PostViewModel", "Last visible post ID set to: $lastVisiblePostId")
     }
 
     private fun updateState() {
@@ -190,7 +182,6 @@ class PostViewModel @Inject constructor(
             repository.showNewPosts()
             _showNewPostsBanner.postValue(false)
             _newPostsCount.postValue(0)
-            updateLastVisiblePostId()
         }
     }
 
@@ -206,6 +197,7 @@ class PostViewModel @Inject constructor(
             try {
                 repository.getAllAsync()
                 _state.value = _state.value?.copy(refreshing = false, error = false)
+                refreshPagingData()
             } catch (e: Exception) {
                 _state.value = _state.value?.copy(refreshing = false, error = true)
                 Log.e("PostViewModel", "Refresh posts error: ${e.message}", e)

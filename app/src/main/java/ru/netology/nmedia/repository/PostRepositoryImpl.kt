@@ -1,6 +1,9 @@
 package ru.netology.nmedia.repository
 
 import android.util.Log
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -20,13 +23,14 @@ import java.io.IOException
 
 class PostRepositoryImpl(
     private val dao: PostDao,
-    private val apiService: ApiService,
+    override val apiService: ApiService,  // Изменено: убран private, добавлен override
 ) : PostRepository {
     private val _syncState = MutableStateFlow(SyncState.DONE)
 
-    override val data: Flow<List<Post>> = dao.getAll()
-        .map { entities -> entities.map(PostEntity::toDto) }
-        .flowOn(Dispatchers.Default)
+    override val data = Pager(
+        config = PagingConfig(pageSize = 5, enablePlaceholders = false),
+        pagingSourceFactory = { PostPagingSource(apiService) },
+    ).flow
 
     override val newPostsCount: Flow<Int> = flow {
         while (true) {

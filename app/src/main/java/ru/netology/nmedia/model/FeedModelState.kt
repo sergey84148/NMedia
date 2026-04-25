@@ -1,6 +1,9 @@
 package ru.netology.nmedia.model
 
+import androidx.paging.PagingData
 import ru.netology.nmedia.dto.Post
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 data class FeedModelState(
     val loading: Boolean = false,
@@ -12,8 +15,6 @@ data class FeedModelState(
 )
 
 data class FeedModel(
-    val posts: List<Post> = emptyList()
-) {
-    val empty: Boolean
-        get() = posts.isEmpty()
-}
+    val posts: Flow<PagingData<Post>> = emptyFlow(),
+    val empty: Boolean = false
+)

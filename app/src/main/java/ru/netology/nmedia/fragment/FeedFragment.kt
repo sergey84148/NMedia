@@ -11,9 +11,13 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.paging.LoadState
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import ru.netology.nmedia.R
 import ru.netology.nmedia.adapter.OnInteractionListener
 import ru.netology.nmedia.adapter.PostsAdapter
@@ -93,38 +97,52 @@ class FeedFragment : Fragment() {
         })
 
         binding.list.adapter = adapter
+        binding.list.layoutManager = LinearLayoutManager(requireContext())
         setupRecyclerViewScrollListener(binding)
 
-        binding.swipeRefreshLayout.setOnRefreshListener {
-            // 👇 Сначала сбрасываем индикатор
-            binding.swipeRefreshLayout.isRefreshing = false
+        // Обработка PagingData
+        lifecycleScope.launch {
+            viewModel.pagingDataFlow.collectLatest { pagingData ->
+                adapter.submitData(pagingData)
+            }
+        }
 
+        // Отслеживаем состояния загрузки
+        lifecycleScope.launch {
+            adapter.loadStateFlow.collect { loadState ->
+                val isLoading = loadState.refresh is LoadState.Loading
+                binding.progress.isVisible = isLoading
+                binding.swipeRefreshLayout.isRefreshing = loadState.refresh is LoadState.Loading
+
+                val isError = loadState.refresh is LoadState.Error
+                if (isError) {
+                    binding.errorGroup.isVisible = true
+                    binding.retryButton.setOnClickListener {
+                        adapter.retry()
+                        binding.errorGroup.isVisible = false
+                    }
+                } else {
+                    binding.errorGroup.isVisible = false
+                }
+
+                // Проверяем, пустой ли список
+                val isEmpty = loadState.refresh is LoadState.NotLoading && adapter.itemCount == 0
+                binding.empty.isVisible = isEmpty
+            }
+        }
+
+        binding.swipeRefreshLayout.setOnRefreshListener {
             if (!isAuthenticated()) {
                 showAuthDialog()
+                binding.swipeRefreshLayout.isRefreshing = false
                 return@setOnRefreshListener
             }
             viewModel.syncWithServer()
-            // Не нужно повторно устанавливать observer
-        }
-
-        viewModel.data.observe(viewLifecycleOwner) { feedModel ->
-            adapter.submitList(feedModel.posts)
-            binding.empty.isVisible = feedModel.posts.isEmpty()
+            binding.swipeRefreshLayout.isRefreshing = false
         }
 
         viewModel.state.observe(viewLifecycleOwner) { state ->
-            binding.progress.isVisible = state.loading
             binding.syncProgress.isVisible = state.syncing
-
-            if (state.error) {
-                binding.errorGroup.isVisible = true
-                binding.retryButton.setOnClickListener {
-                    viewModel.loadPosts()
-                    binding.errorGroup.isVisible = false
-                }
-            } else {
-                binding.errorGroup.isVisible = false
-            }
 
             if (state.pendingPostsCount > 0 && viewModel.isNetworkAvailable.value == false) {
                 binding.noConnectionMessage.text = getString(
@@ -179,7 +197,8 @@ class FeedFragment : Fragment() {
         }
 
         viewModel.postCreated.observe(viewLifecycleOwner) {
-            viewModel.updateLastVisiblePostId()
+            // Обновляем после создания поста
+            adapter.refresh()
         }
     }
 
@@ -254,9 +273,6 @@ class FeedFragment : Fragment() {
 
     private fun smoothScrollToTop(binding: FragmentFeedBinding) {
         binding.list.smoothScrollToPosition(0)
-        binding.list.post {
-            binding.list.smoothScrollToPosition(0)
-        }
     }
 
     private fun updateBannerText(binding: FragmentFeedBinding, count: Int) {
