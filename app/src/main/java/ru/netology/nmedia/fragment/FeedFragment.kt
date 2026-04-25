@@ -32,6 +32,7 @@ class FeedFragment : Fragment() {
     private val authViewModel: AuthViewModel by activityViewModels()
     private var binding: FragmentFeedBinding? = null
     private var isBannerVisible = false
+    private lateinit var adapter: PostsAdapter
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -48,7 +49,7 @@ class FeedFragment : Fragment() {
 
         setupNewPostsBanner(binding)
 
-        val adapter = PostsAdapter(object : OnInteractionListener {
+        adapter = PostsAdapter(object : OnInteractionListener {
             override fun onEdit(post: Post) {
                 if (!isAuthenticated()) {
                     showAuthDialog()
@@ -100,6 +101,16 @@ class FeedFragment : Fragment() {
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         setupRecyclerViewScrollListener(binding)
 
+        // 👇 НАБЛЮДАЕМ ЗА ИЗМЕНЕНИЕМ СОСТОЯНИЯ АВТОРИЗАЦИИ
+        lifecycleScope.launch {
+            authViewModel.authStateChanged.observe(viewLifecycleOwner) { changed ->
+                if (changed) {
+                    // При логине или логауте обновляем список постов
+                    adapter.refresh()
+                }
+            }
+        }
+
         // Обработка PagingData
         lifecycleScope.launch {
             viewModel.pagingDataFlow.collectLatest { pagingData ->
@@ -125,7 +136,6 @@ class FeedFragment : Fragment() {
                     binding.errorGroup.isVisible = false
                 }
 
-                // Проверяем, пустой ли список
                 val isEmpty = loadState.refresh is LoadState.NotLoading && adapter.itemCount == 0
                 binding.empty.isVisible = isEmpty
             }
@@ -137,43 +147,7 @@ class FeedFragment : Fragment() {
                 binding.swipeRefreshLayout.isRefreshing = false
                 return@setOnRefreshListener
             }
-            viewModel.syncWithServer()
-            binding.swipeRefreshLayout.isRefreshing = false
-        }
-
-        viewModel.state.observe(viewLifecycleOwner) { state ->
-            binding.syncProgress.isVisible = state.syncing
-
-            if (state.pendingPostsCount > 0 && viewModel.isNetworkAvailable.value == false) {
-                binding.noConnectionMessage.text = getString(
-                    R.string.sync_error_with_count,
-                    state.pendingPostsCount
-                )
-                binding.noConnectionMessage.isVisible = true
-            } else if (state.pendingPostsCount == 0 && viewModel.isNetworkAvailable.value == false) {
-                binding.noConnectionMessage.text = getString(R.string.network_error)
-                binding.noConnectionMessage.isVisible = true
-            } else if (viewModel.isNetworkAvailable.value == true) {
-                binding.noConnectionMessage.isVisible = false
-            }
-        }
-
-        viewModel.showNoConnectionMessage.observe(viewLifecycleOwner) { show ->
-            if (show == true) {
-                viewModel.state.value?.let { state ->
-                    if (state.pendingPostsCount > 0) {
-                        binding.noConnectionMessage.text = getString(
-                            R.string.sync_error_with_count,
-                            state.pendingPostsCount
-                        )
-                    } else {
-                        binding.noConnectionMessage.text = getString(R.string.network_error)
-                    }
-                }
-                binding.noConnectionMessage.isVisible = true
-            } else {
-                binding.noConnectionMessage.isVisible = false
-            }
+            adapter.refresh()
         }
 
         viewModel.showNewPostsBanner.observe(viewLifecycleOwner) { show ->
@@ -197,7 +171,6 @@ class FeedFragment : Fragment() {
         }
 
         viewModel.postCreated.observe(viewLifecycleOwner) {
-            // Обновляем после создания поста
             adapter.refresh()
         }
     }
@@ -302,7 +275,7 @@ class FeedFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.checkForNewPosts()
+        adapter.refresh()
     }
 
     override fun onPause() {
