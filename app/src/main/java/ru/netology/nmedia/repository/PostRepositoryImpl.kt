@@ -1,16 +1,21 @@
 package ru.netology.nmedia.repository
 
 import android.util.Log
+import androidx.paging.ExperimentalPagingApi
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import ru.netology.nmedia.api.ApiService
 import ru.netology.nmedia.dao.PostDao
+import ru.netology.nmedia.dao.PostRemoteKeyDao
+import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.dto.*
 import ru.netology.nmedia.enumeration.AttachmentType
 import ru.netology.nmedia.enumeration.SyncState
@@ -20,18 +25,29 @@ import ru.netology.nmedia.error.NetworkError
 import ru.netology.nmedia.entity.PostEntity
 import java.io.File
 import java.io.IOException
+import javax.inject.Inject
 
-class PostRepositoryImpl(
+class PostRepositoryImpl @Inject constructor(
     private val dao: PostDao,
+    private val postRemoteKeyDao: PostRemoteKeyDao,
+    private val appDb: AppDb,
     override val apiService: ApiService,
 ) : PostRepository {
     private val _syncState = MutableStateFlow(SyncState.DONE)
 
     // Пагинированные данные
+    @OptIn(ExperimentalPagingApi::class)
     override val data: Flow<PagingData<Post>> = Pager(
-        config = PagingConfig(pageSize = 10, enablePlaceholders = false),
-        pagingSourceFactory = { PostPagingSource(apiService) }
-    ).flow
+        config = PagingConfig(
+            pageSize = 25,
+            enablePlaceholders = false,
+            prefetchDistance = 10  // Увеличиваем расстояние предзагрузки для APPEND
+        ),
+        remoteMediator = PostRemoteMediator(apiService, appDb, dao, postRemoteKeyDao),
+        pagingSourceFactory = dao::pagingSource,
+    ).flow.map { pagingData ->
+        pagingData.map(PostEntity::toDto)
+    }
 
     // Не используется при пагинации
     override val newPostsCount: Flow<Int> = MutableStateFlow(0)
@@ -252,13 +268,9 @@ class PostRepositoryImpl(
         }
     }
 
-    override suspend fun syncWithServer() {
-        // Не используется при пагинации
-    }
+    override suspend fun syncWithServer() = Unit
 
-    override suspend fun retryFailedSync() {
-        // Не используется при пагинации
-    }
+    override suspend fun retryFailedSync() = Unit
 
     override suspend fun checkForNewPosts(afterId: Long): Int = 0
 
@@ -279,7 +291,5 @@ class PostRepositoryImpl(
         }
     }
 
-    override suspend fun getAllAsync() {
-        // Не используется при пагинации
-    }
+    override suspend fun getAllAsync() = Unit
 }

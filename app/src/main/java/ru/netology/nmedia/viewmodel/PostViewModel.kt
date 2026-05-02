@@ -21,7 +21,6 @@ import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
 import ru.netology.nmedia.model.FeedModelState
 import ru.netology.nmedia.model.PhotoModel
-import ru.netology.nmedia.repository.PostPagingSource
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.util.SingleLiveEvent
 import ru.netology.nmedia.utils.RetryPolicy
@@ -60,17 +59,8 @@ class PostViewModel @Inject constructor(
     private val _newPostsCount = MutableLiveData(0)
     val newPostsCount: LiveData<Int> = _newPostsCount
 
-    private var lastVisiblePostId = 0L
-
-    // PagingData поток - создается с фабрикой, которая всегда создает новый PagingSource
-    val pagingDataFlow: Flow<PagingData<Post>> = Pager(
-        config = PagingConfig(pageSize = 10, enablePlaceholders = false),
-        pagingSourceFactory = { PostPagingSource(repository.apiService) }
-    ).flow.cachedIn(viewModelScope)
-
-    fun refreshPagingData() {
-
-    }
+    // PagingData поток через репозиторий
+    val pagingDataFlow: Flow<PagingData<Post>> = repository.data
 
     init {
         viewModelScope.launch {
@@ -78,8 +68,6 @@ class PostViewModel @Inject constructor(
 
             appAuth.authStateFlow.collect { authState ->
                 val isAuth = authState.token != null && authState.id != 0L
-                // При изменении авторизации - pagingDataFlow пересоздастся автоматически
-                // через cachedIn, но нужно уведомить Fragment
                 if (isAuth) {
                     loadPosts()
                 }
@@ -125,9 +113,9 @@ class PostViewModel @Inject constructor(
         return repository.getPendingPostsCount()
     }
 
+    @Suppress("unused")
     fun updateLastVisiblePostId(postId: Long) {
-        lastVisiblePostId = postId
-        Log.d("PostViewModel", "Last visible post ID set to: $lastVisiblePostId")
+        // Не используется при пагинации
     }
 
     private fun updateState() {
@@ -164,16 +152,9 @@ class PostViewModel @Inject constructor(
         }
     }
 
+    @Suppress("unused")
     fun checkForNewPosts() {
-        viewModelScope.launch {
-            try {
-                val currentLastId = lastVisiblePostId
-                Log.d("PostViewModel", "Manual check for new posts after ID: $currentLastId")
-                repository.checkForNewPosts(currentLastId)
-            } catch (e: Exception) {
-                Log.e("PostViewModel", "Error checking new posts", e)
-            }
-        }
+        // Не используется при пагинации
     }
 
     fun onNewPostsBannerClicked() {
@@ -197,7 +178,6 @@ class PostViewModel @Inject constructor(
             try {
                 repository.getAllAsync()
                 _state.value = _state.value?.copy(refreshing = false, error = false)
-                refreshPagingData()
             } catch (e: Exception) {
                 _state.value = _state.value?.copy(refreshing = false, error = true)
                 Log.e("PostViewModel", "Refresh posts error: ${e.message}", e)
@@ -300,20 +280,9 @@ class PostViewModel @Inject constructor(
         return appAuth.authStateFlow.value.token != null
     }
 
+    @Suppress("unused")
     fun syncWithServer() {
-        if (!isAuthenticated()) {
-            Log.d("PostViewModel", "Not authorized, skipping sync")
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                repository.syncWithServer()
-            } catch (e: Exception) {
-                Log.e("PostViewModel", "Sync error:", e)
-                _state.value = _state.value?.copy(error = true)
-            }
-        }
+        // Не используется при пагинации
     }
 
     fun retryFailedSync() {

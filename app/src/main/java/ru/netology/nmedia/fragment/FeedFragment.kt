@@ -101,12 +101,12 @@ class FeedFragment : Fragment() {
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         setupRecyclerViewScrollListener(binding)
 
-        // 👇 НАБЛЮДАЕМ ЗА ИЗМЕНЕНИЕМ СОСТОЯНИЯ АВТОРИЗАЦИИ
+        // Наблюдаем за изменением состояния авторизации
         lifecycleScope.launch {
             authViewModel.authStateChanged.observe(viewLifecycleOwner) { changed ->
                 if (changed) {
-                    // При логине или логауте обновляем список постов
                     adapter.refresh()
+                    authViewModel.resetAuthStateChanged()
                 }
             }
         }
@@ -141,6 +141,7 @@ class FeedFragment : Fragment() {
             }
         }
 
+        // Swipe to refresh - добавляет новые посты сверху, не затирая старые
         binding.swipeRefreshLayout.setOnRefreshListener {
             if (!isAuthenticated()) {
                 showAuthDialog()
@@ -197,6 +198,7 @@ class FeedFragment : Fragment() {
         binding.newPostsBanner.setOnClickListener {
             viewModel.onNewPostsBannerClicked()
             smoothScrollToTop(binding)
+            adapter.refresh()
         }
     }
 

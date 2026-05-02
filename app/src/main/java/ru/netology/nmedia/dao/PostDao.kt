@@ -1,5 +1,6 @@
 package ru.netology.nmedia.dao
 
+import androidx.paging.PagingSource
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 import ru.netology.nmedia.entity.PostEntity
@@ -9,9 +10,13 @@ import ru.netology.nmedia.enumeration.SyncState
 @Dao
 interface PostDao {
 
-    // Основные запросы - используем правильное имя таблицы "posts"
+    // Основные запросы
     @Query("SELECT * FROM posts ORDER BY id DESC")
     fun getAll(): Flow<List<PostEntity>>
+
+    // PagingSource для пагинации
+    @Query("SELECT * FROM posts ORDER BY id DESC")
+    fun pagingSource(): PagingSource<Int, PostEntity>
 
     @Query("SELECT * FROM posts ORDER BY id DESC")
     suspend fun getAllSync(): List<PostEntity>
@@ -84,6 +89,9 @@ interface PostDao {
 
     @Query("DELETE FROM posts WHERE id = :id")
     suspend fun removeById(id: Long)
+
+    @Query("DELETE FROM posts")
+    suspend fun removeAll()
 
     // Операции с лайками и репостами
     @Query(

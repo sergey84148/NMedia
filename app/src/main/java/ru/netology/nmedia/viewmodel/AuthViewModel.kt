@@ -159,6 +159,10 @@ class AuthViewModel @Inject constructor(
         appAuth.removeAuth()
     }
 
+    fun resetAuthStateChanged() {
+        _authStateChanged.postValue(false)
+    }
+
     fun clearError() {
         _authError.value = null
     }

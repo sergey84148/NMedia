@@ -29,7 +29,7 @@ data class PostEntity(
     val attachmentType: AttachmentType? = null
 ) {
     fun toDto(): Post = Post(
-        id = id, // Используем локальный id как основной
+        id = id,
         author = author,
         authorId = authorId,
         authorAvatar = authorAvatar ?: "",
@@ -49,8 +49,12 @@ data class PostEntity(
     )
 
     companion object {
-        fun fromDto(dto: Post, syncState: SyncState = SyncState.SYNCED, isNew: Boolean = false): PostEntity = PostEntity(
-            id = dto.id, // Используем id из DTO (может быть отрицательным для новых постов)
+        fun fromDto(
+            dto: Post,
+            syncState: SyncState = SyncState.SYNCED,
+            isNew: Boolean = false
+        ): PostEntity = PostEntity(
+            id = dto.id,
             author = dto.author,
             authorId = dto.authorId,
             authorAvatar = dto.authorAvatar,
@@ -74,7 +78,7 @@ data class PostEntity(
             syncState: SyncState = SyncState.SYNCED,
             isNew: Boolean = false
         ): PostEntity = existingEntity.copy(
-            id = dto.id, // Обновляем id из DTO
+            id = dto.id,
             author = dto.author,
             authorId = dto.authorId,
             authorAvatar = dto.authorAvatar,
@@ -93,3 +97,8 @@ data class PostEntity(
         )
     }
 }
+
+// Функции расширения для преобразования списков
+fun List<PostEntity>.toDto(): List<Post> = map(PostEntity::toDto)
+
+fun List<Post>.toEntity(): List<PostEntity> = map { PostEntity.fromDto(it) }

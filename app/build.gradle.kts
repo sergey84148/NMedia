@@ -63,6 +63,10 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.room)
     ksp(libs.androidx.room.compiler)
+
+    // 👇 ДОБАВЬТЕ ЭТИ СТРОКИ - Room Paging
+    implementation(libs.androidx.room.paging)
+
     implementation(platform(libs.firebase))
     implementation(libs.firebase.messaging)
     implementation(libs.play.services)
@@ -75,7 +79,11 @@ dependencies {
     implementation(libs.ucrop)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // 👇 ДОБАВЬТЕ ЭТИ СТРОКИ - Paging
     implementation(libs.androidx.paging.runtime.ktx)
+    implementation(libs.androidx.paging.common.ktx)
+
     coreLibraryDesugaring(libs.desugaring)
 
     testImplementation(libs.junit)

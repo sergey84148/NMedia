@@ -6,6 +6,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import ru.netology.nmedia.api.ApiService
 import ru.netology.nmedia.dao.PostDao
+import ru.netology.nmedia.dao.PostRemoteKeyDao
+import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.repository.PostRepositoryImpl
 import javax.inject.Singleton
@@ -18,8 +20,15 @@ object RepositoryModule {
     @Singleton
     fun providePostRepository(
         postDao: PostDao,
+        postRemoteKeyDao: PostRemoteKeyDao,
+        appDb: AppDb,
         apiService: ApiService
     ): PostRepository {
-        return PostRepositoryImpl(postDao, apiService)
+        return PostRepositoryImpl(
+            dao = postDao,
+            postRemoteKeyDao = postRemoteKeyDao,
+            appDb = appDb,
+            apiService = apiService
+        )
     }
 }
