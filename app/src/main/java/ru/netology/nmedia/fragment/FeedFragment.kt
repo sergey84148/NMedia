@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.R
 import ru.netology.nmedia.adapter.OnInteractionListener
+import ru.netology.nmedia.adapter.PostLoadingStateAdapter
 import ru.netology.nmedia.adapter.PostsAdapter
 import ru.netology.nmedia.databinding.FragmentFeedBinding
 import ru.netology.nmedia.dto.Post
@@ -97,11 +98,12 @@ class FeedFragment : Fragment() {
             }
         })
 
-        binding.list.adapter = adapter
+        binding.list.adapter = adapter.withLoadStateFooter(
+            footer = PostLoadingStateAdapter { adapter.retry() }
+        )
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         setupRecyclerViewScrollListener(binding)
 
-        // Наблюдаем за изменением состояния авторизации
         lifecycleScope.launch {
             authViewModel.authStateChanged.observe(viewLifecycleOwner) { changed ->
                 if (changed) {
@@ -111,19 +113,16 @@ class FeedFragment : Fragment() {
             }
         }
 
-        // Обработка PagingData
         lifecycleScope.launch {
-            viewModel.pagingDataFlow.collectLatest { pagingData ->
+            viewModel.data.collectLatest { pagingData ->
                 adapter.submitData(pagingData)
             }
         }
 
-        // Отслеживаем состояния загрузки
         lifecycleScope.launch {
             adapter.loadStateFlow.collect { loadState ->
-                val isLoading = loadState.refresh is LoadState.Loading
-                binding.progress.isVisible = isLoading
-                binding.swipeRefreshLayout.isRefreshing = loadState.refresh is LoadState.Loading
+                val isRefreshing = loadState.refresh is LoadState.Loading
+                binding.swipeRefreshLayout.isRefreshing = isRefreshing
 
                 val isError = loadState.refresh is LoadState.Error
                 if (isError) {
@@ -141,7 +140,6 @@ class FeedFragment : Fragment() {
             }
         }
 
-        // Swipe to refresh - добавляет новые посты сверху, не затирая старые
         binding.swipeRefreshLayout.setOnRefreshListener {
             if (!isAuthenticated()) {
                 showAuthDialog()

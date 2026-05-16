@@ -6,10 +6,12 @@ import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
 import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
+import retrofit2.Response
 import ru.netology.nmedia.api.ApiService
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dao.PostRemoteKeyDao
 import ru.netology.nmedia.db.AppDb
+import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.entity.PostEntity
 import ru.netology.nmedia.entity.PostRemoteKeyEntity
 import ru.netology.nmedia.entity.toEntity
@@ -27,117 +29,136 @@ class PostRemoteMediator(
         loadType: LoadType,
         state: PagingState<Int, PostEntity>
     ): MediatorResult {
-        try {
+        return try {
             when (loadType) {
-                LoadType.REFRESH -> {
-                    // REFRESH - добавляем новые посты сверху, а не затираем
-                    val topPostKey = postRemoteKeyDao.getTopKey()
-                    if (topPostKey == null) {
-                        // Если ключа нет, загружаем первые посты
-                        val response = service.getLatest(state.config.pageSize)
-                        if (!response.isSuccessful) {
-                            throw ApiError(response.code(), response.message())
-                        }
-                        val body = response.body() ?: throw ApiError(
-                            response.code(),
-                            response.message(),
-                        )
-                        if (body.isEmpty()) {
-                            return MediatorResult.Success(endOfPaginationReached = true)
-                        }
-                        db.withTransaction {
-                            postDao.insert(body.toEntity())
-                            postRemoteKeyDao.insert(
-                                PostRemoteKeyEntity(
-                                    type = PostRemoteKeyEntity.KeyType.TOP,
-                                    key = body.first().id,
-                                )
-                            )
-                            postRemoteKeyDao.insert(
-                                PostRemoteKeyEntity(
-                                    type = PostRemoteKeyEntity.KeyType.BOTTOM,
-                                    key = body.last().id,
-                                )
-                            )
-                        }
-                        return MediatorResult.Success(endOfPaginationReached = false)
-                    }
-
-                    // Загружаем новые посты после текущего верхнего
-                    val response = service.getAfter(topPostKey, state.config.pageSize)
-
-                    if (!response.isSuccessful) {
-                        throw ApiError(response.code(), response.message())
-                    }
-                    val body = response.body() ?: throw ApiError(
-                        response.code(),
-                        response.message(),
-                    )
-
-                    if (body.isEmpty()) {
-                        return MediatorResult.Success(endOfPaginationReached = true)
-                    }
-
-                    db.withTransaction {
-                        // Добавляем новые посты, не удаляя старые
-                        postDao.insert(body.toEntity())
-
-                        // Обновляем ключ для верхнего поста
-                        postRemoteKeyDao.insert(
-                            PostRemoteKeyEntity(
-                                type = PostRemoteKeyEntity.KeyType.TOP,
-                                key = body.first().id,
-                            )
-                        )
-                    }
-                    return MediatorResult.Success(endOfPaginationReached = false)
-                }
-
-                LoadType.PREPEND -> {
-                    // PREPEND отключен - не загружаем данные при скролле вверх
-                    return MediatorResult.Success(endOfPaginationReached = true)
-                }
-
-                LoadType.APPEND -> {
-                    // APPEND работает в обычном режиме
-                    val bottomPostKey = postRemoteKeyDao.getBottomKey()
-                        ?: return MediatorResult.Success(endOfPaginationReached = true)
-
-                    val response = service.getBefore(bottomPostKey, state.config.pageSize)
-
-                    if (!response.isSuccessful) {
-                        throw ApiError(response.code(), response.message())
-                    }
-                    val body = response.body() ?: throw ApiError(
-                        response.code(),
-                        response.message(),
-                    )
-
-                    if (body.isEmpty()) {
-                        return MediatorResult.Success(endOfPaginationReached = true)
-                    }
-
-                    db.withTransaction {
-                        postDao.insert(body.toEntity())
-
-                        // Обновляем ключ для нижнего поста
-                        postRemoteKeyDao.insert(
-                            PostRemoteKeyEntity(
-                                type = PostRemoteKeyEntity.KeyType.BOTTOM,
-                                key = body.last().id,
-                            )
-                        )
-                    }
-                    return MediatorResult.Success(endOfPaginationReached = false)
-                }
+                LoadType.REFRESH -> handleRefresh(state)
+                LoadType.PREPEND -> handlePrepend()
+                LoadType.APPEND -> handleAppend(state)
             }
-            return MediatorResult.Success(endOfPaginationReached = true)
         } catch (e: Exception) {
-            if (e is CancellationException) {
-                throw e
-            }
-            return MediatorResult.Error(e)
+            if (e is CancellationException) throw e
+            MediatorResult.Error(e)
         }
+    }
+
+    private suspend fun handleRefresh(state: PagingState<Int, PostEntity>): MediatorResult {
+        val topPostKey = postRemoteKeyDao.getTopKey()
+
+        return if (topPostKey == null) {
+            loadInitialPosts(state.config.pageSize)
+        } else {
+            loadNewPostsAfter(topPostKey, state.config.pageSize)
+        }
+    }
+
+    private suspend fun loadInitialPosts(pageSize: Int): MediatorResult {
+        val response = service.getLatest(pageSize)
+        val posts = validateAndConvertResponse(response)
+
+        if (posts.isEmpty()) {
+            return MediatorResult.Success(endOfPaginationReached = true)
+        }
+
+        db.withTransaction {
+            savePostsToDatabase(posts)
+            saveTopAndBottomKeys(posts.first().id, posts.last().id)
+        }
+
+        return MediatorResult.Success(endOfPaginationReached = false)
+    }
+
+    private suspend fun loadNewPostsAfter(topPostKey: Long, pageSize: Int): MediatorResult {
+        val response = service.getAfter(topPostKey, pageSize)
+        val posts = validateAndConvertResponse(response)
+
+        if (posts.isEmpty()) {
+            return MediatorResult.Success(endOfPaginationReached = true)
+        }
+
+        db.withTransaction {
+            savePostsToDatabase(posts)
+            updateTopKey(posts.first().id)
+        }
+
+        return MediatorResult.Success(endOfPaginationReached = false)
+    }
+
+    private fun handlePrepend(): MediatorResult {
+        // PREPEND отключен - не загружаем данные при скролле вверх
+        return MediatorResult.Success(endOfPaginationReached = true)
+    }
+
+    private suspend fun handleAppend(state: PagingState<Int, PostEntity>): MediatorResult {
+        val bottomPostKey = postRemoteKeyDao.getBottomKey()
+            ?: return MediatorResult.Success(endOfPaginationReached = true)
+
+        val response = service.getBefore(bottomPostKey, state.config.pageSize)
+        val posts = validateAndConvertResponse(response)
+
+        if (posts.isEmpty()) {
+            return MediatorResult.Success(endOfPaginationReached = true)
+        }
+
+        db.withTransaction {
+            savePostsToDatabase(posts)
+            updateBottomKey(posts.last().id)
+        }
+
+        return MediatorResult.Success(endOfPaginationReached = false)
+    }
+
+    // MARK: - Database Operations
+
+    private suspend fun savePostsToDatabase(posts: List<PostEntity>) {
+        postDao.insert(posts)
+    }
+
+    private suspend fun saveTopAndBottomKeys(topKey: Long, bottomKey: Long) {
+        postRemoteKeyDao.insert(
+            PostRemoteKeyEntity(
+                type = PostRemoteKeyEntity.KeyType.TOP,
+                key = topKey,
+            )
+        )
+        postRemoteKeyDao.insert(
+            PostRemoteKeyEntity(
+                type = PostRemoteKeyEntity.KeyType.BOTTOM,
+                key = bottomKey,
+            )
+        )
+    }
+
+    private suspend fun updateTopKey(topKey: Long) {
+        postRemoteKeyDao.insert(
+            PostRemoteKeyEntity(
+                type = PostRemoteKeyEntity.KeyType.TOP,
+                key = topKey,
+            )
+        )
+    }
+
+    private suspend fun updateBottomKey(bottomKey: Long) {
+        postRemoteKeyDao.insert(
+            PostRemoteKeyEntity(
+                type = PostRemoteKeyEntity.KeyType.BOTTOM,
+                key = bottomKey,
+            )
+        )
+    }
+
+    // MARK: - Response Validation
+
+    private suspend fun validateAndConvertResponse(response: Response<List<Post>>): List<PostEntity> {
+        if (!response.isSuccessful) {
+            throw ApiError(response.code(), response.message())
+        }
+
+        val posts = response.body() ?: throw ApiError(
+            response.code(),
+            response.message(),
+        )
+
+        return posts.toEntity()
     }
 
     override suspend fun initialize(): InitializeAction {

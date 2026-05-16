@@ -44,4 +44,9 @@
     <string name="sign_in">Sign In</string>
     <string name="sign_up">Sign Up</string>
     <string name="sign_out">Sign Out</string>
+
+    <!-- Дополнительные строки для push-уведомлений -->
+    <string name="push_notification_title">Новое уведомление</string>
+    <string name="push_notification_text">У вас новое уведомление</string>
+    <string name="Retry">retry</string>
 </resources>

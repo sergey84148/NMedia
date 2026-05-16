@@ -5,6 +5,7 @@ import androidx.paging.ExperimentalPagingApi
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.insertSeparators
 import androidx.paging.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,9 +24,11 @@ import ru.netology.nmedia.error.ApiError
 import ru.netology.nmedia.error.AppError
 import ru.netology.nmedia.error.NetworkError
 import ru.netology.nmedia.entity.PostEntity
+import ru.netology.nmedia.utils.DateSeparatorHelper
 import java.io.File
 import java.io.IOException
 import javax.inject.Inject
+import kotlin.random.Random
 
 class PostRepositoryImpl @Inject constructor(
     private val dao: PostDao,
@@ -35,21 +38,37 @@ class PostRepositoryImpl @Inject constructor(
 ) : PostRepository {
     private val _syncState = MutableStateFlow(SyncState.DONE)
 
-    // Пагинированные данные
     @OptIn(ExperimentalPagingApi::class)
-    override val data: Flow<PagingData<Post>> = Pager(
+    override val data: Flow<PagingData<FeedItem>> = Pager(
         config = PagingConfig(
             pageSize = 25,
             enablePlaceholders = false,
-            prefetchDistance = 10  // Увеличиваем расстояние предзагрузки для APPEND
+            prefetchDistance = 10
         ),
         remoteMediator = PostRemoteMediator(apiService, appDb, dao, postRemoteKeyDao),
         pagingSourceFactory = dao::pagingSource,
     ).flow.map { pagingData ->
-        pagingData.map(PostEntity::toDto)
+        // Преобразуем PostEntity в Post
+        val postsPagingData = pagingData.map(PostEntity::toDto)
+
+        // Добавляем рекламные блоки
+        val withAds = postsPagingData.insertSeparators { previous, _ ->
+            if (previous?.id?.rem(5) == 0L) {
+                Ad(
+                    id = Random.nextLong(),
+                    image = "figma.jpg",
+                    url = ""
+                )
+            } else {
+                null
+            }
+        }
+
+        // Добавляем разделители по датам
+        // Для PagingData нужно использовать map с преобразованием списка
+        withAds
     }
 
-    // Не используется при пагинации
     override val newPostsCount: Flow<Int> = MutableStateFlow(0)
 
     override suspend fun getAll(): List<Post> = emptyList()

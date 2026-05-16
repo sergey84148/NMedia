@@ -7,15 +7,19 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.auth.AppAuth
+import ru.netology.nmedia.dto.Ad
+import ru.netology.nmedia.dto.FeedItem
 import ru.netology.nmedia.dto.MediaUpload
 import ru.netology.nmedia.dto.Post
 import ru.netology.nmedia.enumeration.SyncState
@@ -27,12 +31,29 @@ import ru.netology.nmedia.utils.RetryPolicy
 import java.io.File
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PostViewModel @Inject constructor(
     private val repository: PostRepository,
     private val appAuth: AppAuth,
     private val application: Application
 ) : ViewModel() {
+
+    private val cached = repository.data.cachedIn(viewModelScope)
+
+    @Suppress("UNCHECKED_CAST")
+    val data: Flow<PagingData<FeedItem>> = appAuth.authStateFlow
+        .flatMapLatest { authState ->
+            cached.map { pagingData ->
+                pagingData.map { item ->
+                    when (item) {
+                        is Post -> item.copy(ownedByMe = item.authorId == authState.id)
+                        is Ad -> item
+                        else -> item
+                    }
+                } as PagingData<FeedItem>
+            }
+        }
 
     private val _state = MutableLiveData(FeedModelState())
     val state: LiveData<FeedModelState> = _state
@@ -58,9 +79,6 @@ class PostViewModel @Inject constructor(
 
     private val _newPostsCount = MutableLiveData(0)
     val newPostsCount: LiveData<Int> = _newPostsCount
-
-    // PagingData поток через репозиторий
-    val pagingDataFlow: Flow<PagingData<Post>> = repository.data
 
     init {
         viewModelScope.launch {
@@ -113,11 +131,6 @@ class PostViewModel @Inject constructor(
         return repository.getPendingPostsCount()
     }
 
-    @Suppress("unused")
-    fun updateLastVisiblePostId(postId: Long) {
-        // Не используется при пагинации
-    }
-
     private fun updateState() {
         viewModelScope.launch {
             val pendingCount = repository.getPendingPostsCount()
@@ -152,36 +165,12 @@ class PostViewModel @Inject constructor(
         }
     }
 
-    @Suppress("unused")
-    fun checkForNewPosts() {
-        // Не используется при пагинации
-    }
-
     fun onNewPostsBannerClicked() {
         viewModelScope.launch {
             Log.d("PostViewModel", "Showing new posts")
             repository.showNewPosts()
             _showNewPostsBanner.postValue(false)
             _newPostsCount.postValue(0)
-        }
-    }
-
-    @Suppress("unused")
-    fun refreshPosts() {
-        if (appAuth.authStateFlow.value.token == null) {
-            Log.d("PostViewModel", "Not authorized, skipping refresh")
-            return
-        }
-
-        _state.value = _state.value?.copy(refreshing = true)
-        viewModelScope.launch {
-            try {
-                repository.getAllAsync()
-                _state.value = _state.value?.copy(refreshing = false, error = false)
-            } catch (e: Exception) {
-                _state.value = _state.value?.copy(refreshing = false, error = true)
-                Log.e("PostViewModel", "Refresh posts error: ${e.message}", e)
-            }
         }
     }
 
@@ -259,30 +248,8 @@ class PostViewModel @Inject constructor(
         }
     }
 
-    @Suppress("unused")
-    fun shareById(id: Long) {
-        if (!isAuthenticated()) {
-            _state.value = _state.value?.copy(error = true)
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                repository.shareById(id)
-            } catch (e: Exception) {
-                Log.e("PostViewModel", "Share error:", e)
-                _state.value = _state.value?.copy(error = true)
-            }
-        }
-    }
-
     private fun isAuthenticated(): Boolean {
         return appAuth.authStateFlow.value.token != null
-    }
-
-    @Suppress("unused")
-    fun syncWithServer() {
-        // Не используется при пагинации
     }
 
     fun retryFailedSync() {
@@ -292,18 +259,8 @@ class PostViewModel @Inject constructor(
         }
     }
 
-    @Suppress("unused")
-    fun clearError() {
-        _state.value = _state.value?.copy(error = false, syncError = false)
-    }
-
     fun changePhoto(uri: Uri?, file: File?) {
         _photo.value = PhotoModel(uri, file)
-    }
-
-    @Suppress("unused")
-    fun removePhoto() {
-        _photo.value = null
     }
 
     fun clearEditing() {
@@ -314,8 +271,8 @@ class PostViewModel @Inject constructor(
     companion object {
         val emptyPost = Post(
             id = 0L,
-            author = "",
             authorId = 0,
+            author = "",
             authorAvatar = "",
             content = "",
             published = 0,
@@ -323,7 +280,8 @@ class PostViewModel @Inject constructor(
             likes = 0,
             shares = 0,
             video = null,
-            attachment = null
+            attachment = null,
+            ownedByMe = false
         )
     }
 }

@@ -25,7 +25,6 @@ data class PostEntity(
     val retryCount: Int = 0,
     val isNew: Boolean = false,
     val attachmentUrl: String? = null,
-    val attachmentDescription: String? = null,
     val attachmentType: AttachmentType? = null
 ) {
     fun toDto(): Post = Post(
@@ -42,7 +41,6 @@ data class PostEntity(
         attachment = if (attachmentUrl != null && attachmentType != null) {
             Attachment(
                 url = attachmentUrl,
-                description = attachmentDescription,
                 type = attachmentType
             )
         } else null
@@ -68,7 +66,6 @@ data class PostEntity(
             lastModified = System.currentTimeMillis(),
             isNew = isNew,
             attachmentUrl = dto.attachment?.url,
-            attachmentDescription = dto.attachment?.description,
             attachmentType = dto.attachment?.type
         )
 
@@ -92,7 +89,6 @@ data class PostEntity(
             lastModified = System.currentTimeMillis(),
             isNew = isNew,
             attachmentUrl = dto.attachment?.url,
-            attachmentDescription = dto.attachment?.description,
             attachmentType = dto.attachment?.type
         )
     }
