@@ -104,21 +104,22 @@ class FeedFragment : Fragment() {
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         setupRecyclerViewScrollListener(binding)
 
-        lifecycleScope.launch {
-            authViewModel.authStateChanged.observe(viewLifecycleOwner) { changed ->
-                if (changed) {
-                    adapter.refresh()
-                    authViewModel.resetAuthStateChanged()
-                }
+        // Наблюдаем за изменением состояния авторизации (без lifecycleScope)
+        authViewModel.authStateChanged.observe(viewLifecycleOwner) { changed ->
+            if (changed) {
+                adapter.refresh()
+                authViewModel.resetAuthStateChanged()
             }
         }
 
+        // Обработка PagingData
         lifecycleScope.launch {
             viewModel.data.collectLatest { pagingData ->
                 adapter.submitData(pagingData)
             }
         }
 
+        // Отслеживаем состояние REFRESH для SwipeRefreshLayout
         lifecycleScope.launch {
             adapter.loadStateFlow.collect { loadState ->
                 val isRefreshing = loadState.refresh is LoadState.Loading
@@ -140,6 +141,7 @@ class FeedFragment : Fragment() {
             }
         }
 
+        // Swipe to refresh - вызывает REFRESH
         binding.swipeRefreshLayout.setOnRefreshListener {
             if (!isAuthenticated()) {
                 showAuthDialog()

@@ -1,8 +1,12 @@
 package ru.netology.nmedia.adapter
 
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
+import android.view.animation.BounceInterpolator
 import androidx.core.view.isVisible
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
@@ -57,6 +61,19 @@ class PostsAdapter(
                 AdViewHolder(binding)
             }
             else -> error("unknown view type: $viewType")
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: List<Any?>) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+        } else {
+            val postViewHolder = holder as? PostViewHolder
+            payloads.forEach { payload ->
+                (payload as? PayLoad)?.let { payLoad ->
+                    postViewHolder?.bind(payLoad)
+                }
+            }
         }
     }
 
@@ -143,6 +160,13 @@ class PostViewHolder(
             }
 
             like.setOnClickListener {
+                val scaleX = PropertyValuesHolder.ofFloat(View.SCALE_X, 1F, 1.25F, 1F)
+                val scaleY = PropertyValuesHolder.ofFloat(View.SCALE_Y, 1F, 1.25F, 1F)
+                ObjectAnimator.ofPropertyValuesHolder(it, scaleX, scaleY).apply {
+                    duration = 500
+                    repeatCount = 100
+                    interpolator = BounceInterpolator()
+                }.start()
                 onInteractionListener.onLike(post)
             }
 
@@ -151,7 +175,36 @@ class PostViewHolder(
             }
         }
     }
+
+    fun bind(payload: PayLoad) {
+        payload.likedByMe?.also { likedByMe ->
+            binding.like.isChecked = likedByMe
+            val currentLikes = binding.like.text.toString().toIntOrNull() ?: 0
+            binding.like.text = if (likedByMe) {
+                (currentLikes + 1).toString()
+            } else {
+                (currentLikes - 1).toString()
+            }
+
+            if (likedByMe) {
+                ObjectAnimator.ofPropertyValuesHolder(
+                    binding.like,
+                    PropertyValuesHolder.ofFloat(View.SCALE_X, 1.0F, 1.2F, 1.0F),
+                    PropertyValuesHolder.ofFloat(View.SCALE_Y, 1.0F, 1.2F, 1.0F)
+                ).start()
+            }
+        }
+
+        payload.content?.let { content ->
+            binding.content.text = content
+        }
+    }
 }
+
+data class PayLoad(
+    val likedByMe: Boolean? = null,
+    val content: String? = null,
+)
 
 object PostDiffCallback : DiffUtil.ItemCallback<FeedItem>() {
     override fun areItemsTheSame(oldItem: FeedItem, newItem: FeedItem): Boolean {
@@ -164,5 +217,14 @@ object PostDiffCallback : DiffUtil.ItemCallback<FeedItem>() {
 
     override fun areContentsTheSame(oldItem: FeedItem, newItem: FeedItem): Boolean {
         return oldItem == newItem
+    }
+
+    override fun getChangePayload(oldItem: FeedItem, newItem: FeedItem): Any? {
+        if (oldItem !is Post || newItem !is Post) return null
+
+        return PayLoad(
+            likedByMe = if (oldItem.likedByMe != newItem.likedByMe) newItem.likedByMe else null,
+            content = if (oldItem.content != newItem.content) newItem.content else null,
+        )
     }
 }
